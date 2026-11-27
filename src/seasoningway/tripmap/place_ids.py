@@ -11,8 +11,8 @@ python3 -m seasoningway.tripmap.place_ids trips/<旅程> id1 id2    # 只查（�
 python3 -m seasoningway.tripmap.place_ids trips/<旅程> --missing  # 查所有還沒有 Place ID 的點（點多時 demo key 的額度不夠，不要用）
 python3 -m seasoningway.tripmap.place_ids trips/<旅程> --all      # 全部重查（同上，不要用）
 
-結果寫進 map/place_ids.json。離我們的座標 2 km 以內的直接採用；2–10 km 印出來，加 --accept id1,id2 才採用；
-10 km 以上不採用（改地點的 map_query）。寫完執行 seasoningway build。
+結果寫進 cache/place_ids.json。離我們的座標 2 km 以內的直接採用；2–10 km 印出來，加 --accept id1,id2 才採用；
+10 km 以上不採用（改地點的 map_query）。寫完執行 seasoningway render。
 """
 import datetime
 import json
@@ -24,6 +24,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from ..common import Problem
+from ..files import write_text
 from .data import MapTrip, map_query
 
 URL = "https://places.googleapis.com/v1/places:searchText"
@@ -50,31 +52,31 @@ def search(q: str, lat: float, lon: float, opts: dict) -> list[dict]:
         return json.load(r).get("places", [])
 
 
-def main(argv: list[str]) -> int:
-    accept = set()
-    for a in [a for a in argv if a.startswith("--accept")]:
-        accept |= set(a.split("=", 1)[1].split(",")) if "=" in a else set()
-    args = [a for a in argv if not a.startswith("--")]
-    if not args:
-        print(__doc__); return 1
-    t = MapTrip(Path(args.pop(0)))
-    OUT = t.map / "place_ids.json"
+def refresh(trip_dir: Path, previous: Path, output: Path, today: datetime.date, *,
+            ids: list[str] | None, all_places: bool, accept: set[str]) -> bool:
+    t = MapTrip(trip_dir)
+    unknown = sorted((set(ids or []) | accept) - t.by_id.keys())
+    if unknown:
+        raise Problem("找不到地點：" + "、".join(unknown))
     opts = t.config.get("search", {})
     spots = [{"id": p["id"], "lat": p["location"]["lat"], "lon": p["location"]["lon"], "gq": map_query(p, t.config)} for p in t.places]
-    saved = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {"ids": {}}
-    ids = saved["ids"]
-    if not args and "--all" not in argv and "--missing" not in argv:
-        print(__doc__); return 1
-    todo = [s for s in spots if s.get("gq") and (s["id"] in args if args else ("--all" in argv or s["id"] not in ids))]
+    saved = json.loads(previous.read_text(encoding="utf-8")) if previous.is_file() else {"ids": {}}
+    old_ids = saved["ids"]
+    if not isinstance(old_ids, dict):
+        raise Problem(f"{previous}：ids 要是 JSON 物件")
+    todo = [s for s in spots if s.get("gq") and (s["id"] in ids if ids else (all_places or s["id"] not in old_ids))]
+    if not todo:
+        return False
+    ids = old_ids.copy()
     print(f"要查 {len(todo)} 個點")
-    review, miss, done = [], [], 0
+    review, miss = [], []
     for s in todo:
         try:
             found = search(s["gq"], s["lat"], s["lon"], opts)
-        except urllib.error.HTTPError as e:
-            print(f"Places API 回應 {e.code}：{e.read().decode(errors='replace')[:300]}")
-            break
-        time.sleep(0.15); done += 1
+        except urllib.error.HTTPError as error:
+            error.close()
+            raise Problem(f"Places API 回應 {error.code}，請確認金鑰、額度與 API 設定") from None
+        time.sleep(0.15)
         dist = lambda p: km((s["lat"], s["lon"]), (p["location"]["latitude"], p["location"]["longitude"]))
         # Google 排第一的在 2 km 內就用它（最近的常是旁邊的旅館、館內設施）；否則取最近的
         best = found[0] if found and dist(found[0]) <= NEAR_KM else min(found, key=dist, default=None)
@@ -88,13 +90,23 @@ def main(argv: list[str]) -> int:
             review.append(s["id"]); print("？ " + line)
         else:
             miss.append(s["id"]); ids.pop(s["id"], None); print("✗ " + line)
-    if not done:
-        return 1
-    saved = {"asof": datetime.date.today().isoformat(),
+    saved = {"asof": today.isoformat(),
              "note": "Google 地圖的 Place ID（place_ids.py 用 Places API Text Search 查，和我們的座標對照過）；地圖頁的 Google 地圖路線連結用它指定地點。",
              "ids": dict(sorted(ids.items()))}
-    OUT.write_text(json.dumps(saved, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
+    write_text(output, json.dumps(saved, ensure_ascii=False, indent=1) + "\n")
     print(f"有 Place ID 的點 {len(ids)} 個；待確認 {len(review)} 個：{','.join(review)}；沒採用 {len(miss)} 個：{','.join(miss)}")
+    return True
+
+
+def main(argv: list[str]) -> int:
+    args = [arg for arg in argv if not arg.startswith("--")]
+    if not args:
+        print(__doc__)
+        return 1
+    trip = Path(args[0])
+    cache = trip / "cache/place_ids.json"
+    accept = {id_ for arg in argv if arg.startswith("--accept=") for id_ in arg[9:].split(",")}
+    refresh(trip, cache, cache, datetime.date.today(), ids=args[1:], all_places="--all" in argv, accept=accept)
     return 0
 
 

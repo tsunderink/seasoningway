@@ -7,7 +7,7 @@ from datetime import date
 
 CONFIG = "seasoningway.toml"
 TRIPS = "trips"
-INDEX = "trip-index.md"  # 第 1 階段的旅程總覽，保留根目錄的 README.md 給資料 repo
+OUT = "out"
 
 DONE = "已結束"
 

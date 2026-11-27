@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .budget import (PLAN_STATUSES, budget_warnings, cell, committed_line, compute_budget,
                      render_budget, target_line, total)
-from .common import GENERATED, INDEX, TRIPS, Problem
+from .common import GENERATED, TRIPS, Problem
 from .records import read_record
 from .trips import Trip, load_trips, validate_trip
 
@@ -29,7 +29,7 @@ def render_bookings(trip: Trip, data: dict) -> str:
     open_ = sorted((b for b in items if b["status"] in OPEN_BOOKINGS), key=lambda b: b.get("book_on", ""))
     booked = sorted((b for b in items if b["status"] == "已訂"), key=lambda b: b.get("date", "9999"))
     skipped = [b for b in items if b["status"] == "不需要"]
-    out = [GENERATED.format(how="修改 bookings.json 後執行 seasoningway build"), "", f"# 預訂清單：{trip.title}", ""]
+    out = [GENERATED.format(how="修改 bookings.json 後執行 seasoningway render"), "", f"# 預訂清單：{trip.title}", ""]
     if data.get("note"):
         out += [data["note"], ""]
     out += ["## 待訂（依預訂時間排）", ""]
@@ -54,7 +54,7 @@ def booking_warnings(trip: Trip, data: dict, today: date) -> list[str]:
 
 
 def render_itinerary(trip: Trip, data: dict) -> str:
-    out = [GENERATED.format(how="修改 itinerary.json 後執行 seasoningway build"), "", f"# 逐日行程：{trip.title}", ""]
+    out = [GENERATED.format(how="修改 itinerary.json 後執行 seasoningway render"), "", f"# 逐日行程：{trip.title}", ""]
     if data.get("summary"):
         out += [data["summary"], ""]
     if data["days"]:
@@ -97,32 +97,19 @@ def trip_views(trip: Trip, root: Path, today: date) -> tuple[dict[str, str], lis
     return views, problems, warnings
 
 
-def write_views(trip: Trip, root: Path, today: date) -> list[str]:
-    """寫出視圖，回傳寫了哪些檔；有問題時寫完沒問題的再丟出 Problem。"""
-    views, problems, _ = trip_views(trip, root, today)
-    for name, text in views.items():
-        (trip.path / name).write_text(text, encoding="utf-8", newline="\n")
-    if problems:
-        raise Problem("\n".join(problems))
-    return list(views)
-
-
-# ---------------------------------------------------------------- 總覽
-
-
 def render_index(trips: list[Trip]) -> str:
     def table(items: list[Trip]) -> list[str]:
         if not items:
             return ["（目前沒有）"]
         rows = ["| 旅程 | 狀態 | 日期 | 人數 |", "|---|---|---|--:|"]
         for t in items:
-            rows.append(f"| [{cell(t.title)}](trips/{t.slug}/README.md) | {cell(t.status)} | {t.dates()} | {cell(t.meta.get('travelers', ''))} |")
+            rows.append(f"| [{cell(t.title)}](../trips/{t.slug}/README.md) | {cell(t.status)} | {t.dates()} | {cell(t.meta.get('travelers', ''))} |")
         return rows
 
     active = [t for t in trips if t.active]
     done = [t for t in reversed(trips) if not t.active]
     out = [
-        GENERATED.format(how="執行 seasoningway build 更新"),
+        GENERATED.format(how="執行 seasoningway render 更新"),
         "",
         "# 旅程規劃",
         "",
@@ -138,15 +125,11 @@ def render_index(trips: list[Trip]) -> str:
         "",
         "## 其他",
         "",
-        "- [旅行偏好](profile/preferences.md)",
-        "- [跨旅程心得](profile/lessons.md)",
-        "- [想去的地方](wishlist.md)",
+        "- [旅行偏好](../profile/preferences.md)",
+        "- [跨旅程心得](../profile/lessons.md)",
+        "- [想去的地方](../wishlist.md)",
     ]
     return "\n".join(out) + "\n"
-
-
-def write_index(root: Path) -> None:
-    (root / INDEX).write_text(render_index(load_trips(root)), encoding="utf-8", newline="\n")
 
 
 def section_lines(path: Path, heading: str) -> list[str]:

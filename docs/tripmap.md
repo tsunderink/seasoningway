@@ -10,26 +10,33 @@
 | `map/config.json` | 頁面設定：標題、類別、評分網站、季節推薦度、開車參數、底圖範圍，格式見 [map.schema.json](../src/seasoningway/schemas/map.schema.json) | 手寫 |
 | 旅程 `README.md` 開頭的 `start`、`end` | 頁面的日期 | 手寫 |
 | `map/regions.json` | 一級行政區界（GeoJSON），`properties` 要有 `zh`（名稱）、`focus`（是不是重點地區）；拉遠時在圖磚上面畫界線和名稱 | 從行政區界開放資料轉，出處寫進設定的 `basemap.credits` |
-| `map/base/` | 底圖：`tiles/` 圖磚大圖、`tiles.json` 範圍、`places.json` 地名 | `basemap_tiles.py` |
-| `map/roads.txt`、`map/roads.json` | 開車路網和每個地點接上的路口（選用；沒有就全用直線估） | `roads.py` |
-| `map/place_ids.json` | Google 地圖的 Place ID（選用），只存 ID，不存 Google 的名稱、座標 | `place_ids.py` |
+| `cache/base/` | 底圖：`tiles/` 圖磚大圖、`tiles.json` 範圍、`places.json` 地名 | `basemap_tiles.py` |
+| `cache/roads.txt`、`cache/roads.json` | 開車路網和每個地點接上的路口（選用；沒有就全用直線估） | `roads.py` |
+| `cache/place_ids.json` | Google 地圖的 Place ID（選用），只存 ID，不存 Google 的名稱、座標 | `place_ids.py` |
 | `map/photos.json`、`map/photos/` | 照片和授權資訊（選用），`photos.json` 的鍵是地點 id | 手動 |
-| `map/published.json` | 上次發布的 artifact slug、版本和各檔雜湊 | `seasoningway published` |
-| `map/index.html` | 產生的頁面，不直接改 | `build.py` |
+| `published.json` | 上次發布的 artifact slug、版本與來源和快取的雜湊 | `seasoningway published` |
+| `out/<旅程>/map/index.html` | 地圖頁，與路網、圖磚及照片一併產出 | `seasoningway render` |
 
-第 1 階段沿用這些快取及產物路徑，後續位置見 [設計](design.md#4-產物與快取)。旅程自己的說明（artifact 連結、照片進度、底圖已知限制）放在旅程的 `map/README.md`。
+這些產物與快取的保存規則見 [設計](design.md#4-產物與快取)。旅程自己的說明（artifact 連結、照片進度、底圖已知限制）放在旅程的 `map/README.md`。
 
 ## 指令
 
-- 產生頁面：`seasoningway build`。有 `map/config.json` 的旅程都會跑 `build.py`，`check` 會確認 `index.html` 是最新的。只跑一趟用 `python3 -m seasoningway.tripmap.build trips/<旅程>`。
-- 逐天開車試算：`plan_drive.py`，用 OSRM 算，結果只印出來不存檔。用法寫在檔案開頭；公休判斷的 doctest 由下一行的 unittest 一起跑。
-- 測試：`tests/test_tripmap.py`（在 repo 根目錄跑 `python3 -m unittest discover -s tests`）用一趟假的旅程 build，再用 `test_page.js` 在無頭瀏覽器打開頁面，桌面、手機尺寸各切一次分頁，抓 JS 錯誤。測試需要 Node 的 Playwright 和 Leaflet 1.9.4。改了 `template.html` 的 JS，要補的檢查加在那兩個檔。
-- 路網、Place ID、底圖：`roads.py`、`place_ids.py`、`basemap_tiles.py`，用法和要先下載的資料寫在各檔開頭。
+| 指令 | 輸入與結果 |
+|---|---|
+| `seasoningway render <旅程>` | 驗證後產生 `out/<旅程>/map/`，有 `map/config.json` 的旅程才產生地圖 |
+| `seasoningway fetch <旅程> drive` | 預設讀 `itinerary.json`，或用 `--plan <JSON>` 讀地圖頁行程。透過 OSRM 試算，結果寫進 `cache/drive.txt` |
+| `seasoningway fetch <旅程> roads --pbf <檔案>` | 用已擷取旅程範圍的 OSM PBF 建路網。可用 `--date YYYY-MM-DD` 記資料日期。抓路網時另外安裝 `osmium` |
+| `seasoningway fetch <旅程> basemap --work <資料夾> --rail <GeoJSON>` | 用 N02 鐵路與地圖設定畫底圖。可用 `--date YYYYMMDD` 指定 Protomaps 建置日期 |
+| `seasoningway fetch <旅程> place-ids` | 預設查還沒有 ID 的地點。可加 `--ids <ID …>` 或 `--all`。用環境變數 `GOOG_MAPS_DEMO_KEY` 提供金鑰 |
+
+底圖工具需要在工作目錄安裝 Node 的 `maplibre-gl@5`、`@protomaps/basemaps@5`、Playwright 與無頭 Chromium，另在執行引擎的 Python 環境安裝 `pmtiles shapely mapbox-vector-tile requests pillow numpy`。中文與日文字型使用 Noto Sans CJK。詳見 [底圖程式](../src/seasoningway/tripmap/basemap_tiles.py)。
+
+[地圖測試](../tests/test_tripmap.py) 用虛構資料 render。瀏覽器測試用 Node 的 Playwright 和 Leaflet 1.9.4，在桌面與手機尺寸操作三個分頁並檢查 JS 錯誤。
 
 ## 發布
 
-1. 第一次：把 `index.html`、`roads.txt`、`photos/`、`base/tiles/` 發布成新的 artifact，再 `seasoningway published trips/<旅程>/map <版本號> --slug <slug> --include index.html roads.txt 'photos/*.jpg' 'base/tiles/*/*/*.webp'`。
-2. 之後：用 `published.json` 的 slug 重新發布 `check` 列出的檔案（和上次發布不一樣的），檔名變了的舊檔放進 `remove`，再 `seasoningway published trips/<旅程>/map <新版本號>`。
+1. 第一次：發布 `out/<旅程>/map/` 的頁面和相鄰資源，再執行 `seasoningway published <旅程> <版本號> --slug <slug>`。
+2. 更新：`check` 會指出變動的來源和快取。重新 render 和發布，移除已從產物刪掉的檔案，再執行 `seasoningway published <旅程> <新版本號>`。
 
 artifact 的一個版本最多 512 個檔，頁面、照片、底圖大圖加起來要在這之內，所以圖磚每 4×4 張拼成一張大圖。
 
@@ -39,7 +46,7 @@ artifact 的一個版本最多 512 個檔，頁面、照片、底圖大圖加起
 
 - `plan/stars`：`ids` 是加了星號的地點 id，`updated` 是更新時間。
 - `plan/itinerary`：`days` 以日期為鍵，每天的 `ids` 是照順序排的地點 id，`stay` 是住宿 id。
-- 把 `plan/itinerary` 存成檔案後跑 `plan_drive.py`，可以得到逐天的開車里程、時數、高速里程和預計到住處的時間。下面三種情況會標 ⚠️：超過每天的開車上限、晚於設定的 `arrive_by` 才到、撞到公休日。
+- 把 `plan/itinerary` 存成檔案後跑 `fetch <旅程> drive --plan <JSON>`，可以得到逐天的開車里程、時數、高速里程和預計到住處的時間。下面三種情況會標 ⚠️：超過每天的開車上限、晚於設定的 `arrive_by` 才到、撞到公休日。
 
 ## 改地點
 
@@ -100,7 +107,7 @@ artifact 的一個版本最多 512 個檔，頁面、照片、底圖大圖加起
   - 有開車的日子，在大標題日期那一行的右邊放「Google 地圖 ↗」。起點是前一晚的住處（還沒定就用前一天最後一個點），中途依序是景點，終點是今晚的住處。連結跟著行程即時產生，不用重新發布；只連出去、不嵌入。
   - 每個點用 `gq`（`map_query`）搜尋，Google 才會顯示景點名而不是地址；沒有 `gq` 的用座標。有 Place ID 就一起帶，Google 以 Place ID 為準；中途點每個都有 Place ID 才帶 `waypoint_place_ids`。
   - 中途點超過 3 個時，手機要用 App 開（手機瀏覽器只帶得了 3 個）；超過 9 個只帶前 9 個。這些限制寫在頁首說明和連結的滑鼠提示裡（[Google Maps URLs](https://developers.google.com/maps/documentation/urls/get-started)，查詢於 2026-11-23）。
-  - Place ID 用 `place_ids.py` 查，只查排進行程的點（demo key 有額度限制）。查完要 build、再重新發布。
+  - Place ID 用 `place_ids.py` 查，只查排進行程的點（demo key 有額度限制）。查完要 render，然後重新發布。
 - 開車路線和時數（草案，MVP）：
   - 頁面載入 `roads.txt` 後，每一段都在瀏覽器裡用 A* 算最快路線，沿路畫線。時速用設定的 `drive.network`，不含塞車、天候。改了行程就馬上重算。
   - 路網還沒載入、或某個點接不上路網時，那一段用直線估（設定的 `drive.straight`），標題下寫「直線估算」或「部分直線估算」。超過 `drive.max_hours` 標 ⚠️。路線上標順序編號。

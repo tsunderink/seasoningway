@@ -10,8 +10,8 @@
   國土數值情報 N02 鐵道（2024 年版）下載解壓
 執行：
   python3 -m seasoningway.tripmap.basemap_tiles trips/<旅程> <工作資料夾> <N02-24_RailroadSection.geojson> [Protomaps 建置日期 YYYYMMDD]
-輸出 map/base/tiles/{light,dark}/{z}/{ax}-{ay}.webp（每張是 4×4 個圖磚拼成的大圖）、map/base/tiles.json（範圍、有哪些大圖、資料日期）
-和 map/base/places.json（地名：圖磚裡不畫字，地圖頁照分級另外畫），render.py 會讀這兩個 json。
+輸出 cache/base/tiles/{light,dark}/{z}/{ax}-{ay}.webp（每張是 4×4 個圖磚拼成的大圖）、cache/base/tiles.json（範圍、有哪些大圖、資料日期）
+和 cache/base/places.json（地名：圖磚裡不畫字，地圖頁照分級另外畫），render.py 會讀這兩個 json。
 
 做法：本機開一個伺服器，把遠端 PMTiles（range 讀取）、地形圖磚、字型快取到工作資料夾；
 basemap_tiles_render.mjs 用無頭 Chromium 打開 basemap_tiles.html（配色、圖層在那裡改），一次畫一大塊（6×6 張加四周 256px），
@@ -28,10 +28,11 @@ import requests
 from PIL import Image
 from pmtiles.reader import Reader
 
+from ..common import Problem
 from .data import MapTrip
 
 ASSETS = files(__package__)    # basemap_tiles.html、basemap_tiles_render.mjs
-MAP = WIDE = FINE = ZOOMS = None  # main() 依地圖設定填：旅程的 map/、外圍和細緻的範圍 [基準縮放, x 起, x 迄, y 起, y 迄]、各自的縮放
+MAP = BASE_DIR = WIDE = FINE = ZOOMS = None  # main() 依地圖設定填：旅程的 map/、外圍和細緻的範圍 [基準縮放, x 起, x 迄, y 起, y 迄]、各自的縮放
 N, MG = 6, 256                  # 一塊 6×6 張，四周多畫 256px（邊上的字和線才不會被切掉）
 THEMES = ("light", "dark")
 A, APRON = 4, 4                 # 大圖：4×4 張圖磚，右邊、下面多 4px
@@ -97,11 +98,11 @@ def places(url):
                     out[key] = {"n": "東京" if name == "東京都" else name, "lat": round(lat, 4), "lon": round(lon, 4), "t": t, "p": pop, "z": z}
     rows = sorted(out.values(), key=lambda r: (r["t"], -r["p"]))
     for r in rows: del r["z"]
-    (MAP / "base" / "places.json").write_text(json.dumps(rows, ensure_ascii=False, separators=(",", ":")), encoding="utf-8", newline="\n")
+    (BASE_DIR / "places.json").write_text(json.dumps(rows, ensure_ascii=False, separators=(",", ":")), encoding="utf-8", newline="\n")
     print(len(rows), "個地名", {t: sum(r["t"] == t for r in rows) for t in (1, 2, 3, 4)})
 
 
-def serve(work, pmtiles_url):
+def serve(work, node_modules, pmtiles_url):
     cache = work / "cache"; sess = requests.Session()
 
     @functools.lru_cache(maxsize=8192)
@@ -155,7 +156,7 @@ def serve(work, pmtiles_url):
                 if p == "basemap_tiles.html": return self.send((ASSETS / p).read_bytes(), "text/html; charset=utf-8")
                 if p == "rail.geojson": return self.send((work / p).read_bytes(), "application/json")
                 if parts[0] == "node_modules" and ".." not in parts:
-                    f = work / p; return self.send(f.read_bytes() if f.is_file() else None, "text/css" if p.endswith(".css") else "text/javascript")
+                    f = node_modules.joinpath(*parts[1:]); return self.send(f.read_bytes() if f.is_file() else None, "text/css" if p.endswith(".css") else "text/javascript")
                 if parts[0] == "vt":
                     z, x, y = int(parts[1]), int(parts[2]), int(parts[3].split(".")[0])
                     return self.send(cached(cache / f"vt/{z}/{x}/{y}.mvt", vt(z, x, y)), "application/x-protobuf")
@@ -175,19 +176,25 @@ def serve(work, pmtiles_url):
     return f"http://127.0.0.1:{srv.server_address[1]}"
 
 
-def main(argv):
-    global MAP, WIDE, FINE, ZOOMS
+def main(argv, *, output: Path | None = None):
+    global MAP, BASE_DIR, WIDE, FINE, ZOOMS
     if len(argv) < 3:
         print(__doc__); return 1
     t = MapTrip(Path(argv[0]))
     b = t.config["basemap"]
     MAP, WIDE, FINE = t.map, tuple(b["wide"]), tuple(b["fine"])
+    if not (MAP / "regions.json").is_file():
+        raise Problem("底圖需要 map/regions.json")
+    BASE_DIR = output if output is not None else t.cache / "base"
+    BASE_DIR.mkdir(parents=True, exist_ok=True)
     wz, fz = b.get("wide_zooms", [4, 7]), b.get("fine_zooms", [8, 10])
     ZOOMS = {"wide": range(wz[0], wz[1] + 1), "fine": range(fz[0], fz[1] + 1)}
-    work, n02 = Path(argv[1]).resolve(), argv[2]
+    work_root, n02 = Path(argv[1]).resolve(), argv[2]
     build = argv[3] if len(argv) > 3 else "20261118"
-    if not (work / "rail.geojson").exists(): rail(n02, work / "rail.geojson")
-    url = serve(work, f"https://build.protomaps.com/{build}.pmtiles")
+    work = work_root / build / t.dir.name
+    work.mkdir(parents=True, exist_ok=True)
+    rail(n02, work / "rail.geojson")
+    url = serve(work, work_root / "node_modules", f"https://build.protomaps.com/{build}.pmtiles")
     jobs = []
     for part, zs in ZOOMS.items():
         for z in zs:
@@ -202,11 +209,16 @@ def main(argv):
     jobs.sort(key=lambda j: j["theme"])  # 同一種配色連著畫，不用一直重建地圖
     (work / "chunks").mkdir(exist_ok=True)
     (work / "jobs.json").write_text(json.dumps(jobs), newline="\n")
+    node_paths = [str(work_root / "node_modules")]
+    if os.environ.get("NODE_PATH"):
+        node_paths.append(os.environ["NODE_PATH"])
     with as_file(ASSETS / "basemap_tiles_render.mjs") as script:
-        subprocess.run(["node", str(script), url, str(work / "jobs.json")], check=True)
+        subprocess.run(["node", str(script), url, str(work / "jobs.json")], check=True,
+                       env={**os.environ, "NODE_PATH": os.pathsep.join(node_paths)})
     places(url)
-    out = MAP / "base" / "tiles"
+    out = BASE_DIR / "tiles"
     if out.exists(): shutil.rmtree(out)
+    out.mkdir(parents=True)
     have, total = {}, 0
     for part, zs in ZOOMS.items():
         for z in zs:
@@ -244,9 +256,10 @@ def main(argv):
         for z in zs: ranges[str(z)] = tile_range(WIDE if part == "wide" else FINE, z)
     meta = {"source": f"Protomaps {build}", "date": f"{build[:4]}-{build[4:6]}-{build[6:]}", "fine_min": min(ZOOMS["fine"]),
             "atlas": A, "ranges": ranges, "have": {z: sorted(v) for z, v in have.items()}}
-    (MAP / "base" / "tiles.json").write_text(json.dumps(meta, separators=(",", ":")), encoding="utf-8", newline="\n")
+    (BASE_DIR / "tiles.json").write_text(json.dumps(meta, separators=(",", ":")), encoding="utf-8", newline="\n")
     n = sum(len(v) for v in have.values())
     print(f"{n} 張大圖 × {len(THEMES)} 種配色，共 {total / 1e6:.1f} MB")
+    return 0
 
 
 if __name__ == "__main__":

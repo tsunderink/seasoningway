@@ -4,7 +4,7 @@
 
 旅程資料放在你自己的私人 repo（資料 repo），由任何會讀檔、會跑指令的 AI agent（Claude Code、Codex 或其他）規劃。seasoningway 負責驗證資料、產生頁面、保存到 git，讓不同的 agent 交出同樣工整的成果。
 
-> `check`、`new`、`budget`、`published`、`migrate` 已支援新版資料目錄。其他指令的進度見 [遷移清單](docs/migration.md)。
+> 新版目錄已支援驗證、產物、快取與 Git 保存。各 agent 轉接檔的進度見 [遷移清單](docs/migration.md)。
 
 ## 安裝
 
@@ -19,8 +19,10 @@ pip install "git+https://github.com/tsunderink/seasoningway@<版本>"
 | 指令 | 做什麼 |
 |---|---|
 | `seasoningway status` | 開場：列出旅程、下一步和要處理的問題 |
-| `seasoningway render` | 驗證資料再產生頁面；驗不過就不產出 |
+| `seasoningway render [旅程]` | 驗證資料，再將頁面寫到 `out/` |
 | `seasoningway save` | 驗證、commit、同步 |
+| `seasoningway save --check` | 只讀檢查驗證、工作區與推送狀態 |
+| `seasoningway fetch <旅程> <種類>` | 更新駕車、路網、底圖或地點 ID 快取 |
 | `seasoningway guide <主題>` | 印出規劃流程的說明 |
 | `seasoningway init` / `upgrade` | 建立資料 repo、換版本後更新 |
 

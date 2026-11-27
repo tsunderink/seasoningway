@@ -9,11 +9,13 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from datetime import date
 from importlib.resources import as_file, files
 from pathlib import Path
 
-from seasoningway import checks, cli, common
-from seasoningway.tripmap import build, plan_drive, render, roads
+from fixture_project import seed_project
+from seasoningway import checks, cli, common, records
+from seasoningway.tripmap import plan_drive, render, roads
 from seasoningway.tripmap.data import MapTrip, map_query, page_data, visit_text
 
 CONFIG = {
@@ -42,10 +44,16 @@ def place(pid: str, **extra) -> dict:
 class MapTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.trip = Path(self.tmp.name) / "trips" / "2099-01-test"
-        (self.trip / "places").mkdir(parents=True)
-        (self.trip / "map" / "base").mkdir(parents=True)
-        (self.trip / "research").mkdir()
+        self.root = Path(self.tmp.name).resolve()
+        self.slug = "2099-01-test"
+        self.trip = self.root / "trips" / self.slug
+        self.today = date(2098, 11, 1)
+        seed_project(self.root)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["new", self.slug, "--currency", "TWD"], root=self.root, today=self.today), 0)
+        (self.trip / "places").mkdir()
+        (self.trip / "map").mkdir()
+        (self.trip / "cache/base").mkdir(parents=True)
         (self.trip / "research" / "a.md").write_text("# a\n", encoding="utf-8")
         (self.trip / "README.md").write_text("---\ntitle: 測試\nstatus: 規劃中\nstart: 2099-01-01\nend: 2099-02-02\n"
                                              "travelers: 2\ncurrency: TWD\n---\n# 測試\n", encoding="utf-8")
@@ -59,13 +67,15 @@ class MapTest(unittest.TestCase):
             {"site": "b-site", "score": "3.5–3.6", "scale": 5, "url": "https://example.com/b"},
             {"site": "other", "score": 1, "scale": 5, "url": "https://example.com/o"}],
             visit={"min": 60, "max": 90, "note": "依據", "sources": [], "as_of": "2099-01-10"}))
-        self.write("map/place_ids.json", {"asof": "2099-01-10", "note": "測試", "ids": {"temple": "ChIJ-test"}})
+        self.write("cache/place_ids.json", {"asof": "2099-01-10", "note": "測試", "ids": {"temple": "ChIJ-test"}})
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def write(self, rel: str, data) -> None:
-        (self.trip / rel).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        kind = records.record_kind(f"trips/{self.slug}/{rel}")
+        payload = {"$schema": records.schema_url(kind), **data} if kind else data
+        (self.trip / rel).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
     def test_page_data_maps_place_records_to_page_fields(self):
         data = page_data(MapTrip(self.trip))
@@ -114,25 +124,36 @@ class MapTest(unittest.TestCase):
         ring = [[134.9, 34.9], [135.1, 34.9], [135.1, 35.1], [134.9, 35.1], [134.9, 34.9]]
         self.write("map/regions.json", {"type": "FeatureCollection", "features": [
             {"type": "Feature", "properties": {"zh": "測試縣", "focus": True}, "geometry": {"type": "MultiPolygon", "coordinates": [[ring]]}}]})
-        self.write("map/base/tiles.json", {"date": "20990101", "fine_min": 8, "atlas": 4, "have": {},
+        self.write("cache/base/tiles.json", {"date": "20990101", "fine_min": 8, "atlas": 4, "have": {},
                                            "ranges": {"7": [0, 1, 0, 1], "8": [0, 1, 0, 1]}})
-        self.write("map/base/places.json", [])
+        self.write("cache/base/places.json", [])
 
-    def test_build_explains_missing_map_inputs(self):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            self.assertEqual(build.main([str(self.trip), "--check"]), 1)
-        self.assertIn("trips/2099-01-test/map/ 還缺 regions.json、base/tiles.json、base/places.json", out.getvalue())
+    def test_render_explains_missing_map_inputs(self):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.main(["render", self.slug], root=self.root, today=self.today), 1)
+        self.assertIn("還缺 map/regions.json、cache/base/tiles.json、cache/base/places.json", out.getvalue())
+        self.assertFalse((self.root / "out").exists())
 
-    def test_build_renders_and_check_reports_stale(self):
+    def test_check_reports_malformed_basemap_cache(self):
         self.write_map_inputs()
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            self.assertEqual(build.main([str(self.trip), "--check"]), 1)
-            self.assertEqual(build.main([str(self.trip)]), 0)
-            self.assertEqual(build.main([str(self.trip), "--check"]), 0)
-        self.assertIn("地圖頁不是最新：trips/2099-01-test/map/index.html", out.getvalue())
-        page = (self.trip / "map" / "index.html").read_text(encoding="utf-8")
+        self.write("cache/base/tiles.json", {"fine_min": 8, "ranges": {}})
+        problems, _ = checks.run_check(self.root, self.today)
+        self.assertIn("cache/base/tiles.json 的縮放範圍無效", "\n".join(problems))
+
+    def test_page_reads_cache_and_renders(self):
+        self.write_map_inputs()
+        images = self.trip / "cache/base/tiles/light/8"
+        images.mkdir(parents=True)
+        (images / "0-0.webp").write_bytes(b"test tiles")
+        self.write("cache/roads.json", {"asof": "2099-01-01", "snap": {}})
+        (self.trip / "cache/roads.txt").write_text("test road network", encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["render", self.slug], root=self.root, today=self.today), 0)
+        out = self.root / "out" / self.slug / "map"
+        self.assertEqual((out / "roads.txt").read_text(encoding="utf-8"), "test road network")
+        self.assertEqual((out / "base/tiles/light/8/0-0.webp").read_bytes(), b"test tiles")
+        self.assertFalse((self.trip / "map/index.html").exists())
+        page = (out / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("<!--__", page)
         self.assertEqual(page.count("/*__"), 2)  # 佔位符都換掉了，只剩標題和地點摘要裡故意寫的
         self.assertIn("<title>測試地圖 /*__DATA__*/null</title>", page)  # 先填進去的文字不會再被換掉
@@ -150,8 +171,8 @@ class MapTest(unittest.TestCase):
         要 Node 的 playwright 和 leaflet 套件。CI 設 SEASONINGWAY_BROWSER_TEST=require，缺了就算失敗。"""
         self.write_map_inputs()
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(build.main([str(self.trip)]), 0)
-        result = browse(self.trip / "map" / "index.html")
+            self.assertEqual(cli.main(["render", self.slug], root=self.root, today=self.today), 0)
+        result = browse(self.root / "out" / self.slug / "map/index.html")
         if "skip" in result:
             if os.environ.get("SEASONINGWAY_BROWSER_TEST") == "require":
                 self.fail("瀏覽器測試跑不起來：" + result["skip"])

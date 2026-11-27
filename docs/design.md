@@ -43,13 +43,15 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 | 指令 | 做什麼 | 取代舊引擎的 |
 |---|---|---|
-| `status` | 列出旅程、下一步、check 的問題；工作區乾淨時 `pull --ff-only`，不乾淨只提醒；啟用 git hooks | `start`、`list` |
+| `status` | 列出旅程、下一步、check 的問題；main、branch 模式下工作區乾淨時 `pull --ff-only`，不乾淨只提醒；有 `.githooks/` 時啟用 git hooks | `start`、`list` |
 | `render [旅程]` | 驗證（同 `check`），通過才把頁面產生到 `out/<旅程>/`；不通過就不產出，逐項列出問題 | `build`、`index` |
 | `check` | 只驗證：schema、跨檔案規則、引用、過期、個資 | `check` |
 | `save [-m 說明]` | 見下 | 回合結束前的手動流程、`finish` |
 | `save --check` | 不改任何東西，回報沒通過的驗證、沒保存的改動、沒 push 的 commit | `finish` |
 | `fetch <旅程> <種類>` | 抓要連網的資料（路線、底圖、地點 ID）寫進 `cache/` | `core/tripmap/` 的各個腳本 |
-| `new`、`budget`、`published`、`migrate` | 同舊引擎 | 同名指令 |
+| `new`、`migrate` | 在資料 repo 建立旅程、升級既有資料 | 同名指令 |
+| `budget <旅程>` | 計算並印出預算合計，預算頁由 `render` 產生 | `budget` |
+| `published <旅程> <版本>` | 發布後記錄來源和快取雜湊，第一次加 `--slug` | `published` |
 | `guide <主題>` | 印出流程說明（規劃、蒐集景點、重查、檢查頁面、定案、檢討） | `.agents/skills/` |
 | `init`、`upgrade` | 建立資料 repo；換版本後更新轉接檔並跑 `migrate` | 從模板建立、合併上游 |
 | `hook <claude\|codex\|git> <事件>` | 給各工具的 hook 和 git hooks 呼叫 | `core/hooks.py`、`core/githooks/` |
@@ -71,13 +73,13 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 | 快取（要連網才拿得到、重抓不一定一樣） | 路線、底圖、地點 ID | `trips/<旅程>/cache/`，由 `fetch` 寫入 | 是，當成資料 |
 | 產物（可以從上面兩種重算） | 預算表、行程表、預訂表、總覽、地圖頁 | `out/` | 否 |
 
-產物不 commit，所以不再需要「產生檔是不是最新的」這項檢查，產物也不會在 rebase 時衝突。發布紀錄（`published.json`）記的是來源和快取的雜湊。
+產物不 commit。全量 `render` 會再產生 `out/index.md`，單趟產物放 `out/<旅程>/`，地圖與相鄰資源放其中的 `map/`。發布紀錄（`published.json`）記的是該旅程來源和快取的 SHA-256；從第 3 版遷移的紀錄保留 slug、版本，等下次實際發布再建立來源基準。
 
 ## 5. 品質關卡
 
 由前到後：
 
-1. **schema**：盡量嚴格（列舉值、格式、必填、不准多的欄位）。每個 JSON 用 `$schema` 指向引擎發布的 schema，任何 agent 都能自己驗證。
+1. **schema**：盡量嚴格（列舉值、格式、必填、不准多的欄位）。每個 JSON 用 `$schema` 指向引擎 repo 公開的對應 schema，任何 agent 都能自己驗證。本機使用當前安裝版本隨附的 schema。
 2. **寫入時**（有 hook 的工具）：`hook <工具> pre-edit` 擋下改產物、新出現的個資、不符合 schema 的紀錄；`post-edit` 把問題回給剛寫的 agent。沒有 shell 的 subagent 只能靠這一層得到回饋。
 3. **`render`、`save`**：驗不過就不產出、不保存。這一層對任何 agent 都成立。
 4. **截圖檢查**：用無頭瀏覽器在手機、平板、桌面尺寸看頁面。

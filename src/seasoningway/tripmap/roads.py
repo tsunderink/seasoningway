@@ -26,6 +26,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
+from ..common import Problem
 from .data import MapTrip
 
 sys.setrecursionlimit(100000)
@@ -439,17 +440,22 @@ def write_bin(coord, edges, path):
     return idx, len(order), len(edges), P, len(out)
 
 
-def main(argv):
+def main(argv, *, output: Path | None = None):
     if len(argv) < 2:
         print(__doc__); return 1
     t = MapTrip(Path(argv[0]))
     argv = argv[1:]
-    out = t.map
+    out = output if output is not None else t.cache
+    out.mkdir(parents=True, exist_ok=True)
     spots = [{"id": p["id"], "lat": p["location"]["lat"], "lon": p["location"]["lon"]} for p in t.places]
     ways, closed = read_ways(argv[0], near_cells(spots), trip_months(t.start, t.end), t.config["drive"].get("closed_roads", []))
     print(f"道路 {len(ways)} 條（旅行期間封閉、不收的 {closed} 條）")
+    if not ways:
+        raise Problem("路網範圍內沒有可用道路，請檢查 PBF 範圍")
     coord, edges = build_graph(ways, spots)
     coord, edges = strong_component(coord, edges)
+    if not coord or not edges:
+        raise Problem("路網範圍內沒有可用的連通道路")
     print(f"切成路段 {len(edges)} 段、路口 {len(coord)} 個")
     edges, snap_node = snap_spots(coord, edges, spots)
     edges = connectors(edges, snap_node)

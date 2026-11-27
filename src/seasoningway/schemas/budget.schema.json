@@ -4,8 +4,9 @@
   "description": "金額和匯率。seasoningway budget <旅程> 計算並產生 budget.md。大項（機票、住宿、交通票券）一筆一項；餐飲、雜支用每日概算（單價 × 天數，scope 每人）。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["rates", "items"],
+  "required": ["$schema", "rates", "items"],
   "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/budget.schema.json"},
     "rates": {
       "type": "array",
       "description": "匯率：1 單位外幣 = rate 單位基準幣別；基準幣別不用列",

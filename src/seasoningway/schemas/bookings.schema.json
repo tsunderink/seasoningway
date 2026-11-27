@@ -4,8 +4,9 @@
   "description": "使用者自己預訂，這裡只記狀態和建議預訂時間；沒有欄位放訂位代號、確認碼、付款資訊。產生 bookings.md。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["items"],
+  "required": ["$schema", "items"],
   "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/bookings.schema.json"},
     "note": {
       "$ref": "common.schema.json#/$defs/text",
       "description": "各項共通的條件（例如平台的扣款、取消規則），寫一次放在清單上方"

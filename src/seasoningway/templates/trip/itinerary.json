@@ -1,3 +1,4 @@
 {
+  "$schema": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/itinerary.schema.json",
   "days": []
 }

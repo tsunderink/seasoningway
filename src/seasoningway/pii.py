@@ -4,8 +4,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .common import TRIPS
-from .gitops import added_lines, files_to_scan, generated_files
+from .common import OUT, TRIPS
+from .gitops import added_lines, files_to_scan
 
 
 PII_OK = "pii-ok"
@@ -113,6 +113,5 @@ def check_pii(root: Path) -> list[str]:
 def added_pii(root: Path, sha: str) -> list[str]:
     """commit 新增的行裡疑似個資的位置，供 git pre-push 轉接使用。"""
     added = added_lines(root, sha)
-    skip = generated_files(root, list(added))
-    return [f"{rel}:{n} {kind}" for rel, lines in added.items() if rel not in skip
+    return [f"{rel}:{n} {kind}" for rel, lines in added.items() if rel.split("/")[0] != OUT
             for n, text in lines for _, kind in scan_text(text, rel)]

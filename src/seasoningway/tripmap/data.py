@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
-from ..common import Problem
+from ..common import Problem, real_date
 
 from ..records import parse_front_matter, record_problems
 DEFAULT_TEXTS = {
@@ -27,6 +27,7 @@ class MapTrip:
     def __init__(self, trip_dir: Path):
         self.dir = trip_dir.resolve()
         self.map = self.dir / "map"
+        self.cache = self.dir / "cache"
         root = self.dir.parents[1]  # repo 根目錄（trips/<旅程> 往上兩層）
         problems = []
         sources = [self.map / "config.json", *sorted((self.dir / "places").glob("*.json"))]
@@ -35,6 +36,10 @@ class MapTrip:
         meta = parse_front_matter((self.dir / "README.md").read_text(encoding="utf-8")) or {}
         if not meta.get("start") or not meta.get("end"):
             problems.append(f"{self.dir.relative_to(root).as_posix()}/README.md 開頭要有 start、end（地圖頁的日期）")
+        else:
+            start, end = real_date(meta["start"]), real_date(meta["end"])
+            if start is None or end is None or end < start:
+                problems.append(f"{self.dir.relative_to(root).as_posix()}/README.md：地圖的日期區間錯誤")
         if problems:
             raise Problem("\n".join(problems))
         self.config = load_json(self.map / "config.json")
@@ -42,8 +47,8 @@ class MapTrip:
         self.start, self.end = str(meta["start"]), str(meta["end"])
         self.by_id = {p["id"]: p for p in self.places}
 
-    def optional(self, name: str, default=None):
-        path = self.map / name
+    def optional(self, name: str, default=None, *, cached=False):
+        path = (self.cache if cached else self.map) / name
         return load_json(path) if path.exists() else default
 
 
@@ -133,9 +138,9 @@ def page_spot(p: dict, cfg: dict, place_ids: dict, photos: dict) -> dict:
 def page_data(t: MapTrip) -> dict:
     """頁面內嵌的 DATA：地點、類別、旅程骨架、開車參數、頁面文字。"""
     cfg = t.config
-    place_ids = t.optional("place_ids.json", {"ids": {}})["ids"]
+    place_ids = t.optional("place_ids.json", {"ids": {}}, cached=True)["ids"]
     photos = t.optional("photos.json", {})
-    roads = t.optional("roads.json")
+    roads = t.optional("roads.json", cached=True)
     drive = cfg["drive"]
     known = {c["id"] for c in cfg["categories"]}
     unknown = sorted({c for p in t.places for c in p["categories"]} - known)

@@ -4,9 +4,10 @@
   "description": "景點、餐廳、住宿、租車點，一筆一檔、檔名就是 id。事實附來源，整筆的查詢日期是 as_of。地圖頁（seasoningway.tripmap）讀這些檔。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "name", "region", "location", "categories", "summary", "as_of"],
+  "required": ["$schema", "id", "name", "region", "location", "categories", "summary", "as_of"],
   "anyOf": [{"required": ["sources"]}, {"required": ["ratings"]}],
   "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/place.schema.json"},
     "id": {"$ref": "common.schema.json#/$defs/place_id"},
     "name": {"type": "string", "minLength": 1, "description": "繁體中文名稱；只有原文、沒有通用中文寫法的照原文"},
     "local_name": {"type": "string", "minLength": 1, "description": "當地語言的原文名稱（日文、韓文…）；和 name 一樣就不寫"},
