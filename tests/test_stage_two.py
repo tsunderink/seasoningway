@@ -83,7 +83,7 @@ class StageTwoTest(unittest.TestCase):
         self.write("map/index.html", '<html>const BASE = {}; const DATA = {}; <div id="view-days"></div></html>')
         self.write("bookings.md", "<!-- 由 seasoningway 產生，請勿手動編輯。 -->\n")
         custom = self.write("budget.md", "# 手寫筆記\n")
-        self.write("extra.md", "[預訂](bookings.md)\n")
+        self.write("extra.md", "[預訂](bookings.md)、[bookings.md](bookings.md)\n")
         self.run_cli("migrate")
         self.assertEqual(config.load_config(self.root).format, 4)
         for path in records.record_paths(self.trip):
@@ -98,7 +98,7 @@ class StageTwoTest(unittest.TestCase):
         self.assertFalse((self.trip / "map/index.html").exists())
         self.assertFalse((self.trip / "bookings.md").exists())
         self.assertTrue(custom.is_file())
-        self.assertIn("(bookings.json)", (self.trip / "extra.md").read_text(encoding="utf-8"))
+        self.assertEqual((self.trip / "extra.md").read_text(encoding="utf-8"), "[預訂](bookings.json)、[bookings.json](bookings.json)\n")
         self.assertFalse((self.root / "out").exists())
         self.run_cli("migrate")
 
