@@ -67,6 +67,8 @@
 | 逐日行程 | 檔頭改用 `seasoningway render`；住宿研究連結改從 `out/<旅程>/` 指回來源。 |
 | 地圖 HTML、道路快取 | 逐位元組一致。 |
 
-## 第 5 階段：切換使用者的資料 repo（不由 Codex 做）
+## 第 5 階段：切換使用者的資料 repo（不由 Codex 做，2026-11-27 完成）
 
 資料 repo 的改動由使用者授權的 Claude session 在資料 repo 裡做：安裝 `v0.1.0`、執行 `migrate --from-template`、確認 `render` 的頁面和切換前相同、`save`。Codex 只負責引擎 repo。
+
+切換時在資料 repo 確認：地圖頁、道路快取、底圖圖磚和照片逐位元組相同，Markdown 頁面只差連結目標。之後的改動照一般流程開 PR，發版照 [AGENTS.md](../AGENTS.md)「改動流程」。
