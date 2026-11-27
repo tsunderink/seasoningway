@@ -43,7 +43,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 | 指令 | 做什麼 | 取代舊引擎的 |
 |---|---|---|
-| `status` | 列出旅程、下一步、check 的問題；main、branch 模式下工作區乾淨時 `pull --ff-only`，不乾淨只提醒；有 `.githooks/` 時啟用 git hooks | `start`、`list` |
+| `status` | 列出旅程、下一步、check 的問題；main、branch 模式下工作區乾淨時 `pull --ff-only`，不乾淨只提醒；有 `.githooks/` 時啟用 git hooks；2026-11-27 起依第 7 節自動升級引擎版本 | `start`、`list` |
 | `render [旅程]` | 驗證（同 `check`），通過才把頁面產生到 `out/<旅程>/`；不通過就不產出，逐項列出問題 | `build`、`index` |
 | `check` | 只驗證：schema、跨檔案規則、引用、過期、個資 | `check` |
 | `save [-m 說明]` | 見下 | 回合結束前的手動流程、`finish` |
@@ -108,6 +108,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 - 資料格式另用 `format` 記版本。改紀錄 schema 或旅程 README 的欄位時，更新 `config.FORMAT`、在 `project.MIGRATIONS` 新增從前一版升級的步驟，並用虛構資料測試。`migrate` 支援從第 3 版起升級。
 - 資料 repo 的 `seasoningway.toml` 寫 `engine = "X.Y.Z"`。`upgrade` 一起改這個版本、CI 的 `uses:` 版本，並重寫轉接檔。
 - 安裝的引擎和 `engine` 的 major.minor 不同時：`status` 提醒，`save` 拒絕保存，避免用錯的格式寫資料。
+- 自動升級（2026-11-27）：安裝的引擎是已發布的版本（不是可編輯安裝）且比 `engine` 新時，`status`（也就是 SessionStart hook）在快轉同步後執行 `upgrade` 和 `save`。工作區不乾淨或設定有格式以外的問題就不升級，只提醒。安裝的引擎比較舊時照上一條處理。要跟上新版，只要讓環境安裝最新發布版，例如雲端環境的設定腳本。
 
 ## 8. 從舊引擎拿掉的
 
