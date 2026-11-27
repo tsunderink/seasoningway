@@ -243,6 +243,13 @@ main { padding: 0 12px 40px; display: grid; grid-template-columns: minmax(0, 1fr
 .lv-actions .chipbtn { font-size: 13px; }
 .lv-sync { font-size: 12px; color: var(--muted); }
 .lv-copy { width: 100%; min-height: 120px; margin-top: 8px; font: 12px/1.5 ui-monospace, monospace; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 8px; padding: 8px; box-sizing: border-box; }
+.plan-transfer { box-sizing: border-box; width: min(460px, calc(100% - 24px)); max-height: 90dvh; padding: 16px; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 16px; }
+.plan-transfer::backdrop { background: rgba(0,0,0,.35); }
+.plan-transfer h2 { font-size: 17px; margin: 0 0 8px; }
+.plan-transfer p { font-size: 13px; margin: 8px 0 0; }
+.plan-transfer label { font-size: 14px; }
+.plan-transfer [role="alert"] { color: var(--t5); }
+.plan-transfer [role="alert"]:empty { display: none; }
 .near-head .gs { color: var(--accent); margin-left: 6px; }
 /* 縣名：點一下收合／展開（存在 localStorage <前綴>-folded） */
 .near-head.grp-h { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 40px; margin: 0 0 -6px; padding: 4px 8px 4px 4px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--muted); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -492,6 +499,19 @@ path.dayline.dim { stroke-opacity: .55; }  /* 其他天淡一點但看得到全�
   <p>評分查詢於 <span id="asof"></span>：<!--__RATINGS_NOTE__--></p>
   <p class="credits">照片 Wikimedia Commons，作者與授權見各照片<span class="sep" aria-hidden="true">・</span>底圖 <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap 貢獻者</a>（ODbL），<a href="https://protomaps.com/">Protomaps</a> <span id="tiles-date"></span> 版，Claude 繪製<span class="sep" aria-hidden="true">・</span>山影 <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles on AWS</a>（Mapzen）<!--__CREDITS__--></p>
 </footer>
+<dialog class="plan-transfer" id="plan-import-dialog" aria-labelledby="plan-import-title" aria-describedby="plan-import-hint">
+  <form id="plan-import-form">
+    <h2 id="plan-import-title">匯入行程</h2>
+    <label for="plan-import-code">貼上行程字串</label>
+    <textarea class="lv-copy" id="plan-import-code" spellcheck="false" required autofocus></textarea>
+    <p id="plan-import-hint">匯入會取代目前的景點順序和每晚住宿。</p>
+    <p id="plan-import-error" role="alert"></p>
+    <div class="lv-actions">
+      <button type="button" class="chipbtn" id="plan-import-cancel">取消</button>
+      <button type="submit" class="chipbtn">覆蓋行程</button>
+    </div>
+  </form>
+</dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const DATA = /*__DATA__*/null;
@@ -1316,8 +1336,11 @@ function renderPlan() {
   let html = '<header class="day-head lv-head" id="planhead"><div class="dn">我的行程</div><h2 class="day-title">' + esc(DAYS[0].date) + "–" + esc(DAYS[LAST].date) + "・" + DAYS.length + " 天</h2>" +
     '<div class="day-meta">已排 ' + PI.n + " 個景點（必去 " + PI.must + "）・住宿已定 " + PI.stays + " / " + LAST + " 晚・開車合計約 " + PI.h + " 小時（粗估）" + (PI.over ? '・<span class="warn">⚠️ ' + PI.over + " 天超過 " + DATA.max_h + " 小時</span>" : "") + "</div>" +
     '<p class="day-note">到「景點清單」按住每列左邊的 ⠿ 拖到下面的日期，或按 ＋ 選日期；住宿到「住宿清單」選。這裡按住 ⠿ 可以調整順序、移到別天，拖到「今晚住哪」就是住宿；按 ⋯ 可以上下移、移除，或跳到它在景點清單的位置。</p>' +
-    '<div class="lv-actions"><button type="button" class="chipbtn" data-act="copy-plan">複製行程文字</button><span class="lv-sync" id="plansync">' + esc(planSyncText) + "</span></div>" +
-    '<textarea class="lv-copy" id="plancopy" readonly hidden aria-label="行程文字"></textarea></header>';
+    '<div class="lv-actions"><button type="button" class="chipbtn" data-act="copy-plan">複製行程文字</button>' +
+    '<button type="button" class="chipbtn" data-act="export-plan">匯出行程</button><button type="button" class="chipbtn" data-act="import-plan">匯入行程</button>' +
+    '<span class="lv-sync" id="plansync">' + esc(planSyncText) + "</span></div>" +
+    '<textarea class="lv-copy" id="plancopy" readonly hidden aria-label="行程文字"></textarea>' +
+    '<textarea class="lv-copy" id="planexport" readonly hidden aria-label="行程字串"></textarea></header>';
   DAYS.forEach((d, i) => {
     const x = PI.days[i], dn = "第 " + (i + 1) + " 天", title = dayTitle(i);
     html += '<section class="day" id="day-' + i + '" data-day="' + i + '">' +
@@ -1345,6 +1368,10 @@ function renderPlan() {
     document.getElementById("dayhead-" + i).scrollIntoView({ behavior: reduce() ? "auto" : "smooth", block: "start" });
   }));
   list.querySelector('[data-act="copy-plan"]').addEventListener("click", e => copyText(e.currentTarget, planText(), document.getElementById("plancopy"), "複製行程文字"));
+  list.querySelector('[data-act="export-plan"]').addEventListener("click", e => copyText(e.currentTarget, exportPlan(), document.getElementById("planexport"), "匯出行程"));
+  list.querySelector('[data-act="import-plan"]').addEventListener("click", () => {
+    planImportForm.reset(); planImportError.textContent = ""; planImportDialog.showModal();
+  });
   scrollItems = [...list.querySelectorAll("#planhead, .day-head, .pempty, .mini, .pstay-empty")];
   dayPins();
 }
@@ -1760,6 +1787,53 @@ function planText() {
   });
   return out.join("\n");
 }
+const PLAN_CODE_PREFIX = "SWP1:";
+const planTrip = [PAGE.storage, TRIP.start, TRIP.end, HOME];
+function exportPlan() {
+  return PLAN_CODE_PREFIX + JSON.stringify({ trip: planTrip, days: planDoc().days });
+}
+function readPlanCode(value) {
+  const text = value.trim();
+  const malformed = "請貼上「匯出行程」產生的完整字串。";
+  if (!text.startsWith(PLAN_CODE_PREFIX)) throw new Error(malformed);
+  let payload;
+  try { payload = JSON.parse(text.slice(PLAN_CODE_PREFIX.length)); }
+  catch (e) { throw new Error(malformed); }
+  if (!payload || !Array.isArray(payload.trip) || !payload.days || typeof payload.days !== "object" || Array.isArray(payload.days)) throw new Error(malformed);
+  if (JSON.stringify(payload.trip) !== JSON.stringify(planTrip)) throw new Error("這份行程的旅程或日期和目前地圖不符。");
+
+  const known = id => typeof id === "string" && Object.hasOwn(byId, id);
+  const seen = new Set();
+  for (const [date, entry] of Object.entries(payload.days)) {
+    const day = DAYS.findIndex(d => d.iso === date);
+    if (day < 0 || !entry || !Array.isArray(entry.ids) || (day === LAST && Object.hasOwn(entry, "stay"))) throw new Error(malformed);
+    for (const id of entry.ids) {
+      if (!known(id)) throw new Error("目前地圖缺少行程中的地點。請確認兩邊的地圖版本。");
+      if (id === HOME || seen.has(id)) throw new Error(malformed);
+      seen.add(id);
+    }
+    if (Object.hasOwn(entry, "stay") && !known(entry.stay)) throw new Error("目前地圖缺少行程中的住宿。請確認兩邊的地圖版本。");
+  }
+  return cleanPlan({ days: payload.days, updated: plan.updated });
+}
+const planImportDialog = document.getElementById("plan-import-dialog");
+const planImportForm = document.getElementById("plan-import-form");
+const planImportCode = document.getElementById("plan-import-code");
+const planImportError = document.getElementById("plan-import-error");
+document.getElementById("plan-import-cancel").onclick = () => planImportDialog.close();
+planImportCode.addEventListener("input", () => { planImportError.textContent = ""; });
+planImportForm.addEventListener("submit", event => {
+  event.preventDefault();
+  let next;
+  try { next = readPlanCode(planImportCode.value); }
+  catch (error) { planImportError.textContent = error.message; return; }
+  const snap = JSON.stringify(cleanPlan(plan));
+  planImportDialog.close();
+  if (JSON.stringify(next) === snap) { toast("目前已是這份行程"); return; }
+  plan = next;
+  commitPlan("已匯入行程", snap);
+  document.querySelector('[data-act="import-plan"]')?.focus({ preventScroll: true });
+});
 async function copyText(btn, t, ta, label) {
   try { await navigator.clipboard.writeText(t); btn.textContent = "已複製"; setTimeout(() => { btn.textContent = label; }, 1600); }
   catch (e) { ta.hidden = false; ta.value = t; ta.focus(); ta.select(); btn.textContent = "請手動複製下面的文字"; }
