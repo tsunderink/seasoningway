@@ -51,7 +51,9 @@ def create_trip(root: Path, slug: str, title: str | None, travelers: int, curren
         text = resource.read_text(encoding="utf-8")
         text = re.sub(r"\{\{(\w+)\}\}", lambda match: values[match[1]], text)
         path.write_text(text, encoding="utf-8", newline="\n")
+    # README 連到 research/；Git 不追蹤空目錄，pre-commit 驗證索引快照時連結會斷，所以放一個佔位檔。
     (dest / "research").mkdir(exist_ok=True)
+    (dest / "research" / ".gitkeep").touch()
     return load_trip(root, slug)
 
 
