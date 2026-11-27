@@ -39,7 +39,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 找資料 repo：`--root`，沒給就從目前目錄往上找 `seasoningway.toml`。
 
-第 1 階段用 `migrate` 初始化空目錄。這個階段沿用 `build` 和 `check` 的產物比對，總覽寫到 `trip-index.md`，各旅程的視圖位置見 [資料規範](data-spec.md)。第 2 階段換成 `render`。地圖輸入與測試見 [tripmap.md](tripmap.md)。
+地圖的輸入與測試見 [tripmap.md](tripmap.md)。
 
 | 指令 | 做什麼 | 取代舊引擎的 |
 |---|---|---|

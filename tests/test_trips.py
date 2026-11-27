@@ -161,7 +161,7 @@ class ScanTest(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertNotEqual(self.kinds(text), [])
         for text in ("https://www.google.com/maps/search/?api=1&query=35.6,139.7&query_place_id=ChIJ123",
-                     "https://example.com/hotel?checkin=2027-01-05&adults=4&ref=nav",
+                     "https://example.com/hotel?checkin=2099-01-10&adults=2&ref=nav",
                      "https://example.com/?q=email+template",
                      "confirmation 會寄到信箱",
                      "https://example.com/app?mobile=1&tel=1#mail=x",
