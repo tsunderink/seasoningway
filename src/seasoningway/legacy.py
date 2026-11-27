@@ -13,7 +13,7 @@ from urllib.parse import quote, unquote
 from . import __version__
 from .adapters import adapter_files, cmd_init, configure_git, project_files, safe_destination
 from .checks import run_check
-from .common import CONFIG, OUT, TRIPS, Problem
+from .common import CONFIG, ENGINE_DOCS, OUT, TRIPS, Problem
 from .files import replace_paths, write_text
 from .gitops import active_operation, checked_git, git_repo_problem, run_git
 from .migration import generated_markdown
@@ -31,6 +31,14 @@ OLD_ATTRIBUTES = {
         "budget.md", "bookings.md", "itinerary.md", "map/index.html", "map/roads.txt",
         "map/base/places.json", "map/base/tiles.json",
     )),
+}
+# 舊引擎的說明會隨 core/ 刪掉，資料裡連過去的改連引擎 repo 公開的對應文件。
+OLD_DOCS = {
+    "core/tripmap": "tripmap.md",
+    "core/tripmap/README.md": "tripmap.md",
+    "core/docs/architecture.md": "design.md",
+    "core/docs/data-spec.md": "data-spec.md",
+    "core/docs/roadmap.md": "roadmap.md",
 }
 DATA_LINK = re.compile(r"(?<!!)\]\(([^()\s#]+)(#[^()\s]*)?\)")
 
@@ -89,6 +97,8 @@ def rebase_data_links(text: str, source: str, removed_index: bool) -> str:
         if re.match(r"^(?:[a-z][a-z0-9+.-]*:|/)", target, re.I):
             return match[0]
         original = posixpath.normpath(posixpath.join("data", source, unquote(target)))
+        if original in OLD_DOCS:
+            return f"]({ENGINE_DOCS}{OLD_DOCS[original]}{fragment or ''})"
         if original == OLD_CONFIG:
             new = CONFIG
         elif original == "data/README.md" and removed_index:

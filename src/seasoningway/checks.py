@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote
 
-from .common import CONFIG, TRIPS, Problem, real_date
+from .common import CONFIG, ENGINE_DOCS, TRIPS, Problem, real_date
 from .config import ASSISTANTS, Config, config_problems
 from .gitops import files_to_scan
 from .pii import check_pii
@@ -29,7 +29,8 @@ def research_problems(root: Path, path: Path) -> list[str]:
     rel = path.relative_to(root).as_posix()
     problems = []
     for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if ("http://" in line or "https://" in line) and not ACCESSED_RE.search(line):
+        sources = line.replace(f"]({ENGINE_DOCS}", "](")  # 連到引擎說明的不算來源
+        if ("http://" in sources or "https://" in sources) and not ACCESSED_RE.search(line):
             problems.append(f"{rel}:{n}：有來源連結，但同一行沒有「查詢於 YYYY-MM-DD」")
         problems += [f"{rel}:{n}：「查詢於 {d}」不是存在的日期" for d in ACCESSED_RE.findall(line) if not real_date(d)]
     return problems

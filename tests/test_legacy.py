@@ -129,6 +129,29 @@ class LegacyMigrationTest(DataRepoTest):
         self.ok(self.cli("save", "--check"))
         self.assertEqual(self.ok(self.git("status", "--porcelain")), "")
 
+    def test_rewrites_view_links_in_records_and_old_engine_doc_links(self):
+        itinerary = self.root / "data" / TRIP / "itinerary.json"
+        text = itinerary.read_text(encoding="utf-8")
+        itinerary.write_text(text.replace('"plan": "抵達範例市，車站寄放行李"',
+                                          '"plan": "抵達範例市，取消期限見 [bookings.md](bookings.md)、[預算](budget.md)"'),
+                             encoding="utf-8", newline="\n")
+        readme = self.root / "data" / TRIP / "README.md"
+        readme.write_text(readme.read_text(encoding="utf-8") +
+                          "\n- 地圖說明見 [core/tripmap](../../../core/tripmap/README.md#介面規格)\n",
+                          encoding="utf-8", newline="\n")
+        research = self.root / "data" / TRIP / "research/lodging.md"
+        research.write_text(research.read_text(encoding="utf-8") +
+                            "\n開車時數的算法見 [core/tripmap](../../../../core/tripmap/README.md)。\n",
+                            encoding="utf-8", newline="\n")
+        self.save_legacy()
+        self.ok(self.cli("migrate", "--from-template"))  # 研究筆記連到引擎說明，不要求「查詢於」
+        self.assertIn("](https://github.com/tsunderink/seasoningway/blob/main/docs/tripmap.md)",
+                      (self.root / TRIP / "research/lodging.md").read_text(encoding="utf-8"))
+        plan = json.loads((self.root / TRIP / "itinerary.json").read_text(encoding="utf-8"))["days"][0]["plan"]
+        self.assertEqual(plan, "抵達範例市，取消期限見 [bookings.json](bookings.json)、[預算](budget.json)")
+        self.assertIn("[core/tripmap](https://github.com/tsunderink/seasoningway/blob/main/docs/tripmap.md#介面規格)",
+                      (self.root / TRIP / "README.md").read_text(encoding="utf-8"))
+
     def test_conflict_and_failed_validation_leave_original_files_intact(self):
         collision = self.write("profile/preferences.md", "# 根目錄已存在\n")
         before = (self.root / "data/trips.toml").read_bytes()

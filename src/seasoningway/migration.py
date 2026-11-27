@@ -102,6 +102,12 @@ def upgrade_v4(root: Path) -> list[str]:
                 delete.append(page)
         if (trip / "map/config.json").is_file() and (page in delete or not page.exists()):
             converted_views["map/index.html"] = "map/config.json"
+        # 紀錄的文字欄位也會寫連結（例如行程備註連到 bookings.md），和 Markdown 一樣改到紀錄檔。
+        for path in record_paths(trip):
+            text = updates.get(path) or path.read_text(encoding="utf-8")
+            new = update_view_links(text, path.parent.relative_to(trip).as_posix(), converted_views)
+            if new != text:
+                updates[path] = new
         for path in trip.rglob("*.md"):
             if path in delete:
                 continue
