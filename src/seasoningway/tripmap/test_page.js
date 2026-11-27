@@ -16,57 +16,64 @@ async function launch() {
 }
 
 const SIZES = { desktop: { width: 1280, height: 900 }, phone: { width: 390, height: 844 } };
+const routeLeaflet = ctx => ctx.route('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', route =>
+  route.fulfill({ path: leaflet, contentType: 'application/javascript' }));
 const planCards = page => page.evaluate(() => {
   const cards = kind => Array.from(document.querySelectorAll(`#list .mini[data-kind="${kind}"]`),
     ({ dataset }) => [dataset.day, dataset.id]);
   return { stops: cards('plan'), stays: cards('stay') };
 });
 
-async function savedPlans(page) {
-  await page.addInitScript(() => {
-    const saved = JSON.parse(localStorage.getItem('test-db-plan'));
-    window.testPlanWrites = 0;
-    window.claude = { use: async () => ({ doc: path => {
-      const value = path === 'plan/itinerary' ? saved : null;
-      return {
-        get: async () => ({ exists: value !== null, data: () => value }),
-        onSnapshot: () => {},
-        set: async () => { if (path === 'plan/itinerary') window.testPlanWrites++; },
-      };
-    } }) };
-  });
+async function savedPlans(browser, url) {
+  const runScenario = async (local, saved) => {
+    const ctx = await browser.newContext({ viewport: SIZES.desktop });
+    try {
+      await routeLeaflet(ctx);
+      await ctx.addInitScript(({ local, saved }) => {
+        if (local !== null) localStorage.setItem('test-plan', JSON.stringify(local));
+        window.testPlanWrites = 0;
+        window.claude = { use: async () => ({ doc: path => {
+          const value = path === 'plan/itinerary' ? saved : null;
+          return {
+            get: async () => ({ exists: value !== null, data: () => value }),
+            onSnapshot: () => {},
+            set: async () => { if (path === 'plan/itinerary') window.testPlanWrites++; },
+          };
+        } }) };
+      }, { local, saved });
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on('pageerror', e => errors.push(String(e)));
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#plansync')?.textContent.startsWith('已'));
+      const cards = await planCards(page);
+      const writes = await page.evaluate(() => window.testPlanWrites);
+      if (errors.length) throw new Error(errors.join('\n'));
+      return { cards, writes };
+    } finally {
+      await ctx.close();
+    }
+  };
   const empty = { days: {}, updated: '2099-01-02T00:00:00Z' };
   const remote = { days: { '2099-01-01': { stay: 'inn' } } };
-  const reload = async (local, db) => {
-    await page.evaluate(([local, db]) => {
-      for (const [key, value] of [['test-plan', local], ['test-db-plan', db]]) {
-        if (value === null) localStorage.removeItem(key);
-        else localStorage.setItem(key, JSON.stringify(value));
-      }
-    }, [local, db]);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#plansync')?.textContent.startsWith('已'));
-    return planCards(page);
-  };
-  const local = await reload(empty, null);
-  const fromDb = await reload(null, remote);
-  const newerLocal = await reload(empty, { ...remote, updated: '2099-01-01T00:00:00Z' });
-  const fallback = await reload(null, null);
-  const fallbackWrites = await page.evaluate(() => window.testPlanWrites);
+  const { cards: local } = await runScenario(empty, null);
+  const { cards: fromDb } = await runScenario(null, remote);
+  const { cards: newerLocal } = await runScenario(empty, { ...remote, updated: '2099-01-01T00:00:00Z' });
+  const { cards: fallback, writes: fallbackWrites } = await runScenario(null, null);
   return { local, remote: fromDb, newerLocal, fallback, fallbackWrites };
 }
 
 (async () => {
   const browser = await launch();
+  const url = pathToFileURL(process.argv[2]).href;
   const out = {};
   for (const [name, viewport] of Object.entries(SIZES)) {
     const ctx = await browser.newContext({ viewport });  // 每種尺寸一個新的 localStorage
-    await ctx.route('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', route =>
-      route.fulfill({ path: leaflet, contentType: 'application/javascript' }));
+    await routeLeaflet(ctx);
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(String(e)));
-    await page.goto(pathToFileURL(process.argv[2]).href, { waitUntil: 'domcontentloaded' });
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
     if (await page.evaluate(() => typeof window.L === 'undefined')) throw new Error('Leaflet 載不到');
     const text = sel => page.evaluate(s => (document.querySelector(s) || {}).textContent || '', sel);
     const r = { legend: await text('#legend'), title: await page.title(), views: {} };
@@ -77,11 +84,11 @@ async function savedPlans(page) {
     r.plan = await planCards(page);
     r.maptoggle = await page.isVisible('#maptoggle');  // 只有窄螢幕有「收起地圖」
     if (r.maptoggle) { await page.click('#maptoggle'); await page.click('#maptoggle'); }
-    if (name === 'desktop') r.saved = await savedPlans(page);
     r.errors = errors;
     out[name] = r;
     await ctx.close();
   }
+  out.desktop.saved = await savedPlans(browser, url);
   await browser.close();
   console.log(JSON.stringify(out));
 })().catch(e => { console.log(JSON.stringify({ error: String(e) })); process.exit(1); });
