@@ -1,58 +1,20 @@
 """驗證並依資料 repo 的 Git 設定保存。"""
-from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 from . import __version__
 from .adapters import GIT_EVENTS, adapter_files, adapter_path, project_files
 from .checks import print_issues, run_check
-from .common import CONFIG, OUT, TRIPS, Problem
+from .common import CONFIG, OUT, PROFILE, TRIPS, Problem, data_path
 from .config import config_problems, engine_warning
 from .files import write_text
-from .gitops import (active_operation, checked_git, dirty, git_path, git_repo_problem,
-                     git_sync, run_git, unmerged)
+from .gitops import (Target, active_operation, checked_git, dirty, git_path, git_repo_problem,
+                     git_sync, run_git, sync_target, unmerged, unpushed_count)
 from .pii import scan_text
-
-
-@dataclass
-class Target:
-    remote: str
-    ref: str
-    tracking: str
-
-
-def sync_target(root: Path, mode: str) -> Target | None:
-    if mode == "local":
-        return None
-    branch = checked_git(root, "branch", "--show-current").strip()
-    if mode == "main":
-        if branch != "main":
-            raise Problem("git.mode = main：請先切到 main")
-        checked_git(root, "remote", "get-url", "origin")
-        return Target("origin", "refs/heads/main", "refs/remotes/origin/main")
-    if not branch:
-        raise Problem("git.mode = branch：目前是 detached HEAD，請先切到要保存的分支")
-    tracking = checked_git(root, "for-each-ref", "--format=%(upstream)%00%(upstream:remotename)%00%(upstream:remoteref)",
-                           f"refs/heads/{branch}").strip().split("\0")
-    if len(tracking) != 3 or not all(tracking):
-        raise Problem(f"{branch} 還沒有 upstream：請先設定這個分支的 upstream")
-    return Target(tracking[1], tracking[2], tracking[0])
-
-
-def unpushed_count(root: Path, target: Target) -> int:
-    if run_git(root, "rev-parse", "--verify", "--quiet", "HEAD").returncode:
-        return 0
-    has_tracking = not run_git(root, "show-ref", "--verify", "--quiet", target.tracking).returncode
-    exclude = ["--not", target.tracking] if has_tracking else []
-    return int(checked_git(root, "rev-list", "--count", "HEAD", *exclude).strip())
 
 
 def names(text: str) -> set[str]:
     return set(filter(None, text.split("\0")))
-
-
-def data_path(path: str) -> bool:
-    return path in (CONFIG, "wishlist.md") or path.startswith((f"{TRIPS}/", "profile/"))
 
 
 def bootstrap_paths(root: Path, paths: set[str]) -> set[str]:
@@ -98,7 +60,7 @@ def commit_message(paths: set[str], note: str | None) -> str:
         parts = path.split("/")
         if path == CONFIG:
             kinds.add("設定")
-        elif parts[0] == "profile":
+        elif parts[0] == PROFILE:
             kinds.add("偏好與心得")
         elif parts[0] == TRIPS:
             name = parts[2].lower() if len(parts) > 2 else ""

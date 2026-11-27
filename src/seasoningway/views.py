@@ -1,15 +1,13 @@
-"""預訂、行程、旅程總覽與下一步的視圖。"""
+"""預訂、行程與旅程總覽的視圖。"""
 from __future__ import annotations
 
-import re
 from datetime import date
 from pathlib import Path
 
-from .budget import (PLAN_STATUSES, budget_warnings, cell, committed_line, compute_budget,
-                     render_budget, target_line, total)
-from .common import GENERATED, TRIPS, Problem
+from .budget import budget_warnings, cell, compute_budget, render_budget
+from .common import GENERATED, PROFILE, TRIPS, WISHLIST, Problem
 from .records import read_record
-from .trips import Trip, load_trips, validate_trip
+from .trips import Trip
 
 
 OPEN_BOOKINGS = ("待訂", "看需要")
@@ -125,50 +123,8 @@ def render_index(trips: list[Trip]) -> str:
         "",
         "## 其他",
         "",
-        "- [旅行偏好](../profile/preferences.md)",
-        "- [跨旅程心得](../profile/lessons.md)",
-        "- [想去的地方](../wishlist.md)",
+        f"- [旅行偏好](../{PROFILE}/preferences.md)",
+        f"- [跨旅程心得](../{PROFILE}/lessons.md)",
+        f"- [想去的地方](../{WISHLIST})",
     ]
     return "\n".join(out) + "\n"
-
-
-def section_lines(path: Path, heading: str) -> list[str]:
-    lines, inside = [], False
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("## "):
-            inside = line[3:].strip() == heading
-        elif inside and line.strip() and not line.strip().startswith("<!--"):
-            lines.append(line.rstrip())
-    return lines
-
-
-def print_active_trips(root: Path) -> int:
-    active = [t for t in load_trips(root) if t.active]
-    if not active:
-        print("目前沒有進行中的旅程。")
-    for t in active:
-        print(f"- {t.slug}｜{t.title}｜{t.status}｜{t.dates()}")
-        try:
-            if t.budget_target is not None and (t.path / "budget.json").exists():
-                b = compute_budget(t, root)
-                print("    " + target_line(t, total(b.lines, None, PLAN_STATUSES)) + "；" + committed_line(b))
-        except Problem as e:
-            print(f"    預算算不出來：{e}")
-        steps = section_lines(t.path / "README.md", "下一步")
-        for line in steps[:LIST_STEPS]:
-            print(f"    下一步 {brief(line)}")
-        if len(steps) > LIST_STEPS:
-            print(f"    ……還有 {len(steps) - LIST_STEPS} 項")
-        if steps:
-            print(f"    （每項只列開頭，全文在 {TRIPS}/{t.slug}/README.md）")
-    return 0
-
-
-LIST_STEPS = 8
-BRIEF_CHARS = 70
-
-
-def brief(line: str, limit: int = BRIEF_CHARS) -> str:
-    """SessionStart hook 每次開 session、壓縮對話都會印 list，所以每項只留開頭，省 context。"""
-    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", line.strip().removeprefix("- "))
-    return text if len(text) <= limit else text[: limit - 1] + "…"

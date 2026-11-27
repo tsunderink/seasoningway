@@ -16,10 +16,10 @@ from .pii import check_pii
 from .published import published_states, unpublished
 from .records import (STALE_DAYS, missing_dependency, record_kind, record_paths,
                       record_problems, ref_problems, stale_values)
-from .trips import Trip, load_trips
+from .trips import Trip, load_trips, section_lines
 from .tripmap import build as map_build
 from .tripmap.render import MapPage
-from .views import VIEW_SOURCES, section_lines, trip_views
+from .views import VIEW_SOURCES, trip_views
 
 
 ACCESSED_RE = re.compile(r"查詢於\s*(\d{4}-\d{2}-\d{2})")
@@ -152,30 +152,31 @@ def file_problems(root: Path, path: Path) -> list[str]:
     return (research_problems(root, path) if research else []) + link_problems(root, path)
 
 
-def hygiene_warnings(root: Path, files: list[Path], today: date, cfg: Config) -> list[str]:
+def note_warnings(rel: str, text: str, linked: set[Path], path: Path) -> list[str]:
+    """一份 Markdown 的字數預算；研究筆記另查同段重複引用和有沒有被連到。"""
     warnings = []
-    texts = {p: p.read_text(encoding="utf-8") for p in files}
-    linked = linked_notes(root, texts)
-    for path, text in texts.items():
-        rel = path.relative_to(root).as_posix()
-        if path.suffix != ".md":
-            continue
-        limit = next(n for pattern, n in CHAR_BUDGET if PurePosixPath(rel).full_match(pattern))
-        if len(text) > limit:
-            warnings.append(f"{rel}：{len(text):,} 字，超過 {limit:,} 字的預算，精簡或拆檔")
-        if "/research/" in rel:
-            section, counts = "", {}
-            for line in text.splitlines() + ["#"]:
-                if line.startswith("#"):
-                    repeated = [u for u, c in counts.items() if c >= REPEAT_CITES]
-                    if repeated:
-                        warnings.append(f"{rel}「{section}」：同一來源引用了 {max(counts.values())} 次，改成段首一行「來源：…」")
-                    section, counts = line.lstrip("# ").strip(), {}
-                elif ACCESSED_RE.search(line) and not line.startswith("來源："):
-                    for u in set(re.findall(r"\]\((https?://[^)\s]+)\)", line)):
-                        counts[u] = counts.get(u, 0) + 1
-            if path.resolve() not in linked:
-                warnings.append(f"{rel}：沒有任何檔案連到它；還有用就從 README 或相關筆記連過來，沒用就刪")
+    limit = next(n for pattern, n in CHAR_BUDGET if PurePosixPath(rel).full_match(pattern))
+    if len(text) > limit:
+        warnings.append(f"{rel}：{len(text):,} 字，超過 {limit:,} 字的預算，精簡或拆檔")
+    if "/research/" not in rel:
+        return warnings
+    section, counts = "", {}
+    for line in text.splitlines() + ["#"]:
+        if line.startswith("#"):
+            if any(c >= REPEAT_CITES for c in counts.values()):
+                warnings.append(f"{rel}「{section}」：同一來源引用了 {max(counts.values())} 次，改成段首一行「來源：…」")
+            section, counts = line.lstrip("# ").strip(), {}
+        elif ACCESSED_RE.search(line) and not line.startswith("來源："):
+            for u in set(re.findall(r"\]\((https?://[^)\s]+)\)", line)):
+                counts[u] = counts.get(u, 0) + 1
+    if path.resolve() not in linked:
+        warnings.append(f"{rel}：沒有任何檔案連到它；還有用就從 README 或相關筆記連過來，沒用就刪")
+    return warnings
+
+
+def script_warnings(root: Path) -> list[str]:
+    """旅程資料夾裡的程式要列在同層 README。"""
+    warnings = []
     for script in sorted(p for ext in ("*.py", "*.mjs") for p in (root / TRIPS).glob(f"*/**/{ext}")):
         readme, rel = script.parent / "README.md", script.relative_to(root).as_posix()
         if "__pycache__" in script.parts:
@@ -184,23 +185,40 @@ def hygiene_warnings(root: Path, files: list[Path], today: date, cfg: Config) ->
             warnings.append(f"{rel}：同資料夾沒有 README.md；還有用就寫一份列出每支程式，沒用就刪")
         elif script.name not in readme.read_text(encoding="utf-8"):
             warnings.append(f"{rel}：同資料夾的 README.md 沒提到它；還有用就寫進檔案表，沒用就刪")
+    return warnings
+
+
+def readme_warnings(trip: Trip, cfg: Config) -> list[str]:
+    """旅程 README「已決定」「待決定」「下一步」的寫法（AGENTS.md「事實來源」）。"""
+    readme, where = trip.path / "README.md", f"{TRIPS}/{trip.slug}/README.md"
+    sections = {heading: section_lines(readme, heading) for heading in ("已決定", "待決定", "下一步")}
+    warnings = []
+    for heading, limit in SECTION_LIMITS:
+        lines = [l for l in sections[heading] if l.startswith("- ")]
+        if len(lines) > limit:
+            warnings.append(f"{where}「{heading}」有 {len(lines)} 項（上限 {limit}）：合併、刪掉做完或被取代的")
+    for line in sections["已決定"]:
+        if line.startswith("- ") and not DECIDED_RE.match(line[2:]):
+            warnings.append(f"{where}「已決定」要以決定的日期開頭（YYYY-MM-DD：）：{line[2:22]}…")
+    for line in sections["下一步"]:
+        if line.startswith("- ") and not line[2:].startswith(cfg.actors):
+            warnings.append(f"{where}「下一步」要先寫誰做（{'、'.join(cfg.actors)}；"
+                            f"角色代稱寫在 {CONFIG} 的 people.roles）：{line[2:22]}…")
+        elif not line[2:].startswith(ASSISTANTS) and re.search(r"(?<![補已])訂(?!單)", line) and "bookings.json" not in line:
+            warnings.append(f"{where}「下一步」：要訂的東西寫進 bookings.json（附建議預訂時間、連結），再連到 bookings.json：{line[2:22]}…")
+    if any("見下" in l for l in sections["已決定"]):
+        warnings.append(f"{where}「已決定」有「見下」：決定改了就改原來那一條")
+    return warnings
+
+
+def hygiene_warnings(root: Path, files: list[Path], today: date, cfg: Config) -> list[str]:
+    texts = {p: p.read_text(encoding="utf-8") for p in files}
+    linked = linked_notes(root, texts)
+    warnings = [w for path, text in texts.items() if path.suffix == ".md"
+                for w in note_warnings(path.relative_to(root).as_posix(), text, linked, path)]
+    warnings += script_warnings(root)
     for trip in load_trips(root):
-        readme = trip.path / "README.md"
-        for heading, limit in SECTION_LIMITS:
-            lines = [l for l in section_lines(readme, heading) if l.startswith("- ")]
-            if len(lines) > limit:
-                warnings.append(f"{TRIPS}/{trip.slug}/README.md「{heading}」有 {len(lines)} 項（上限 {limit}）：合併、刪掉做完或被取代的")
-        for line in section_lines(readme, "已決定"):
-            if line.startswith("- ") and not DECIDED_RE.match(line[2:]):
-                warnings.append(f"{TRIPS}/{trip.slug}/README.md「已決定」要以決定的日期開頭（YYYY-MM-DD：）：{line[2:22]}…")
-        for line in section_lines(readme, "下一步"):
-            if line.startswith("- ") and not line[2:].startswith(cfg.actors):
-                warnings.append(f"{TRIPS}/{trip.slug}/README.md「下一步」要先寫誰做（{'、'.join(cfg.actors)}；"
-                                f"角色代稱寫在 {CONFIG} 的 people.roles）：{line[2:22]}…")
-            elif not line[2:].startswith(ASSISTANTS) and re.search(r"(?<![補已])訂(?!單)", line) and "bookings.json" not in line:
-                warnings.append(f"{TRIPS}/{trip.slug}/README.md「下一步」：要訂的東西寫進 bookings.json（附建議預訂時間、連結），再連到 bookings.json：{line[2:22]}…")
-        if any("見下" in l for l in section_lines(readme, "已決定")):
-            warnings.append(f"{TRIPS}/{trip.slug}/README.md「已決定」有「見下」：決定改了就改原來那一條")
+        warnings += readme_warnings(trip, cfg)
         if trip.active:
             warnings += stale_for_decisions(root, trip, today)
             warnings += entry_missing(trip, today)

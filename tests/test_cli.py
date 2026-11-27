@@ -1,5 +1,6 @@
 import contextlib
 import io
+import os
 import subprocess
 import sys
 import tempfile
@@ -29,8 +30,8 @@ class CliTest(unittest.TestCase):
     def test_help_lists_every_command(self):
         code, out, _ = run()
         self.assertEqual(code, 0)
-        for name, _ in cli.COMMANDS:
-            self.assertIn(name, out)
+        for command in cli.COMMANDS:
+            self.assertIn(command.name, out)
 
     def test_guide_lists_available_topics_and_rejects_unknown(self):
         code, out, _ = run("guide", "--help")
@@ -74,6 +75,39 @@ class CliTest(unittest.TestCase):
         self.assertTrue((trip / "published.json").is_file())
         self.assertEqual((root / "README.md").read_text(encoding="utf-8"), "# 自訂說明\n")
         self.assertFalse((root / "data").exists())
+
+    def test_commands_declare_their_root(self):
+        self.assertEqual(len(cli.BY_NAME), len(cli.COMMANDS))
+        self.assertEqual(cli.BY_NAME["init"].needs, cli.Needs.HERE)
+        self.assertEqual({c.name for c in cli.COMMANDS if c.needs is cli.Needs.NOTHING}, {"guide", "hook"})
+        self.assertEqual({c.name for c in cli.COMMANDS if c.needs is cli.Needs.CURRENT},
+                         {"new", "budget", "published", "fetch"})
+
+    def test_root_resolution_follows_the_declaration(self):
+        empty = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        cwd = Path.cwd()
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(empty)
+        code, _, err = run("check")
+        self.assertEqual(code, 1)
+        self.assertIn("找不到 seasoningway.toml", err)
+        code, _, err = run("migrate", "--from-template")
+        self.assertEqual(code, 1)
+        self.assertIn("data/trips.toml", err)
+        code, out, _ = run("guide", "decide")
+        self.assertEqual(code, 0)
+        self.assertTrue(out)
+
+        (empty / "seasoningway.toml").write_text("format = 3\n", encoding="utf-8")
+        nested = empty / "trips"
+        nested.mkdir()
+        os.chdir(nested)
+        code, _, err = run("budget", "2099-01-example")
+        self.assertEqual(code, 1)
+        self.assertIn("第 3 版：請先執行 seasoningway migrate", err)
+        self.assertEqual(cli.resolve_root(cli.BY_NAME["check"], None, None), empty.resolve())
+        self.assertEqual(cli.resolve_root(cli.BY_NAME["init"], None, None), nested.resolve())
+        self.assertIsNone(cli.resolve_root(cli.BY_NAME["hook"], None, None))
 
 
 if __name__ == "__main__":

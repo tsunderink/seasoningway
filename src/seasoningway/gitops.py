@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from .common import OUT, Problem
@@ -130,3 +131,37 @@ def dirty(root: Path) -> bool:
 
 def unmerged(root: Path) -> list[str]:
     return sorted(filter(None, checked_git(root, "diff", "--name-only", "--diff-filter=U", "-z").split("\0")))
+
+
+@dataclass
+class Target:
+    remote: str
+    ref: str
+    tracking: str
+
+
+def sync_target(root: Path, mode: str) -> Target | None:
+    """依 git.mode 決定保存到哪個遠端分支；local 不同步，回傳 None。"""
+    if mode == "local":
+        return None
+    branch = checked_git(root, "branch", "--show-current").strip()
+    if mode == "main":
+        if branch != "main":
+            raise Problem("git.mode = main：請先切到 main")
+        checked_git(root, "remote", "get-url", "origin")
+        return Target("origin", "refs/heads/main", "refs/remotes/origin/main")
+    if not branch:
+        raise Problem("git.mode = branch：目前是 detached HEAD，請先切到要保存的分支")
+    tracking = checked_git(root, "for-each-ref", "--format=%(upstream)%00%(upstream:remotename)%00%(upstream:remoteref)",
+                           f"refs/heads/{branch}").strip().split("\0")
+    if len(tracking) != 3 or not all(tracking):
+        raise Problem(f"{branch} 還沒有 upstream：請先設定這個分支的 upstream")
+    return Target(tracking[1], tracking[2], tracking[0])
+
+
+def unpushed_count(root: Path, target: Target) -> int:
+    if run_git(root, "rev-parse", "--verify", "--quiet", "HEAD").returncode:
+        return 0
+    has_tracking = not run_git(root, "show-ref", "--verify", "--quiet", target.tracking).returncode
+    exclude = ["--not", target.tracking] if has_tracking else []
+    return int(checked_git(root, "rev-list", "--count", "HEAD", *exclude).strip())

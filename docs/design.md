@@ -37,7 +37,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 ## 3. 指令
 
-找資料 repo：`--root`，沒給就從目前目錄往上找 `seasoningway.toml`。`init` 預設在目前目錄建立。`guide` 可在任意目錄執行。
+找資料 repo：`--root`，沒給就從目前目錄往上找 `seasoningway.toml`。`init` 預設在目前目錄建立。`guide` 可在任意目錄執行。每個指令在 `cli.COMMANDS` 宣告一次：參數、處理函式和要哪種資料 repo（`Needs`），找根目錄與格式檢查由 `cli.main` 統一處理（2026-11-27）。
 
 地圖的輸入與測試見 [tripmap.md](tripmap.md)。
 
@@ -59,7 +59,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 **`save` 的行為：**
 
 1. 驗證，不通過就停下並列出問題。
-2. 加入已追蹤檔案的改動、`trips/` 和 `profile/` 底下的新檔，以及 `seasoningway.toml` 和 `wishlist.md`。2026-11-27 起也接受 `init`、`upgrade` 新增且內容符合範本的轉接檔與初始 Git 設定檔。其他新檔會列出來並停止保存，由 agent 移走或加進 `.gitignore`。
+2. 加入已追蹤檔案的改動、`trips/` 和 `profile/` 底下的新檔，以及 `seasoningway.toml` 和 `wishlist.md`（資料路徑定義在 `common.DATA_DIRS`、`DATA_FILES`）。2026-11-27 起也接受 `init`、`upgrade` 新增且內容符合範本的轉接檔與初始 Git 設定檔。其他新檔會列出來並停止保存，由 agent 移走或加進 `.gitignore`。
 3. commit 訊息由程式產生（改了哪趟旅程、哪幾種檔），`-m` 可以附一句說明。
 4. 依 `git.mode` 同步：`main` 先 `pull --rebase` 再 push；本地有還沒 push 的 merge 時改用 `--no-rebase`。`branch` 推目前分支的 upstream。`local` 只 commit。
 5. 有衝突就讓 rebase 停在衝突處，列出衝突的檔案，結束碼不是 0。agent 整合完再執行一次 `save`，`save` 會接著完成。絕不自動選一邊。
