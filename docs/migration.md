@@ -58,7 +58,7 @@
 
 - [x] `migrate --from-template`：`data/*` 搬到根目錄、`data/trips.toml` 改成 `seasoningway.toml` 並加上 `engine`、地圖快取搬進 `cache/`、刪掉舊的引擎檔案、執行 `init`。用虛構的舊目錄 fixture 驗證。
 - [x] 對照測試：同一份 demo 以舊引擎 `build` 和新版 `render` 產生頁面，差異見下表。測試使用舊引擎的 Markdown 產物和地圖 SHA-256；有舊引擎時可設定 `SEASONINGWAY_LEGACY_CORE` 指向舊 `core/`，跑 `python3 -m unittest discover -s tests -p test_legacy.py` 當場重建舊頁面。
-- [ ] 發布 `v0.1.0`。Claude 合併後，`main` 的 CI 通過時，發布 workflow 會在該次測試的 commit 建立標籤與 Release。
+- [x] 發布 [`v0.1.0`](https://github.com/tsunderink/seasoningway/releases/tag/v0.1.0)。
 
 | 產物 | 差異 |
 |---|---|
