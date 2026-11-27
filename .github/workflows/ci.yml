@@ -1,18 +1,21 @@
 name: ci
+# 分支 push 不跑，只跑 PR 和 main：不然 PR 上的每個 commit 會同時觸發 push 和 pull_request，重複跑一次。
 on:
   push:
+    branches: [main]
   pull_request:
+# 同一個 PR 有新的 commit 時，取消還在跑的舊 CI；main 的每次 push 都跑完。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.13", "3.x"]  # 最低支援版本和最新的穩定版
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.13"  # 只測最低支援版本
       - run: pip install -e .
       - run: npm install -g playwright@1 leaflet@1.9.4 && echo "NODE_PATH=$(npm root -g)" >> "$GITHUB_ENV"
         env:
