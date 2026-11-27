@@ -1,0 +1,18 @@
+# 這個資料 repo 使用的 seasoningway 版本。
+engine = "{{engine}}"
+format = 0  # 資料格式版本，由 seasoningway migrate 更新
+
+[git]
+# main：保存到 origin/main，branch：保存到目前分支的 upstream，local：只 commit。
+# mode = "main"
+
+[budget]
+default_currency = ""  # 新旅程預算的基準幣別（三碼，例如 TWD）
+
+[people]
+# 旅程 README「下一步」開頭寫誰做：「使用者」「Claude」「Codex」一律可以用，同行者的角色代稱列在這裡
+roles = ["我", "朋友"]
+
+[publish]
+# artifact：網頁發布成 claude.ai artifact，check 會提醒沒重新發布的改動；none：不發布、不提醒
+target = "artifact"

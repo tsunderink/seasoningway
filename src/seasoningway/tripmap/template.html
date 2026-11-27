@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><!--__TITLE__--></title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/*__LEAFLET_CSS__*/
+</style>
+<style>
+/* 版面：桌面左邊地圖（貼齊篩選列和左緣、固定）、右邊清單；手機地圖固定在上、清單在下 */
+:root {
+  --bg: #eef2f5; --surface: #ffffff; --ink: #18212c; --muted: #5a6573; --rule: #cfd7df;
+  /* 顏色只有兩種意思：藍＝介面；紅橘黃灰＝季節推薦度。住宿用中性深灰 */
+  --accent: #2563eb; --accent-ink: #ffffff;
+  --stay: #3d4654; --stay-ink: #ffffff;
+  --sea: #d3e1eb; --land: #fbfaf7; --land-dim: #eef0f1;
+  /* --sea、--road、--nat、--rail 和底圖圖磚（basemap_tiles.html）的顏色一致 */
+  --road: #f4c57a; --road-case: #d29a4e; --nat: #fdf3cf; --nat-case: #d9c48c; --rail: #8d96a3; --border-line: #a9a291; --city: #737b86; --halo: rgba(250,249,245,.92);
+  --t5: #c62828; --t4: #ef6c00; --t3: #f6c344; --t2: #7f8ea6; --t1: #b9c1cb;
+  --t5-ink: #ffffff; --t4-ink: #ffffff; --t3-ink: #3a2c00; --t2-ink: #ffffff; --t1-ink: #2f3742;
+  --seg-track: rgba(24,33,44,.07); --seg-on: #ffffff;
+  --warn: #9a5b00;
+  --font-display: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --pin-h: 44px;  /* 「第 X 天」精簡列高度（最小觸控高度） */
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141a; --surface: #171e27; --ink: #e5eaf0; --muted: #9aa6b3; --rule: #2c3743;
+    --accent: #6ea8fe; --accent-ink: #0b1220; --stay: #cbd5e1; --stay-ink: #111827;
+    --sea: #0e1b25; --land: #1e2833; --land-dim: #161e27;
+    --road: #a07a45; --road-case: #4a3a24; --nat: #6b6656; --nat-case: #2b333c; --rail: #6d7887; --border-line: #56616e; --city: #909ba8; --halo: rgba(15,20,26,.92);
+    --t5: #ef5350; --t4: #ff9a3c; --t3: #ffd166; --t2: #8fa1bb; --t1: #5f6875;
+    --t5-ink: #ffffff; --t4-ink: #2a1500; --t3-ink: #2a2000; --t2-ink: #0f141a; --t1-ink: #e5eaf0; --warn: #e0a54a;
+    --seg-track: rgba(229,234,240,.08); --seg-on: #2b3542;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #171e27; --ink: #e5eaf0; --muted: #9aa6b3; --rule: #2c3743;
+  --accent: #6ea8fe; --accent-ink: #0b1220; --stay: #cbd5e1; --stay-ink: #111827;
+  --sea: #0e1b25; --land: #1e2833; --land-dim: #161e27;
+  --road: #a07a45; --road-case: #4a3a24; --nat: #6b6656; --nat-case: #2b333c; --rail: #6d7887; --border-line: #56616e; --city: #909ba8; --halo: rgba(15,20,26,.92);
+  --t5: #ef5350; --t4: #ff9a3c; --t3: #ffd166; --t2: #8fa1bb; --t1: #5f6875;
+  --t5-ink: #ffffff; --t4-ink: #2a1500; --t3-ink: #2a2000; --t2-ink: #0f141a; --t1-ink: #e5eaf0; --warn: #e0a54a;
+  --seg-track: rgba(229,234,240,.08); --seg-on: #2b3542;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+header.top { padding: 20px 20px 12px; max-width: 1400px; margin: 0 auto; display: grid; gap: 10px; }
+h1 { font-family: var(--font-display); font-size: 26px; line-height: 1.3; margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); }  /* 和下面的統計卡同寬，不限行長（只佔左半邊看起來像被切掉） */
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 8px 12px; }
+.stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 13px; }
+.notes { margin: 0; padding-left: 20px; color: var(--ink); }
+.notes li { margin: 2px 0; }
+
+/* ── 頂端列：只有檢視分頁一行，三個分頁高度一樣，切換時地圖不跳；放不下就左右滑 ── */
+.toolbar { position: sticky; top: 0; z-index: 1100; background: var(--bg); background: color-mix(in srgb, var(--bg) 80%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); border-bottom: 1px solid var(--rule); }
+@media (min-resolution: 2dppx) { .toolbar { border-bottom-width: .5px; } }
+/* 系統設定「降低透明度」時，介面列改成不透明 */
+@media (prefers-reduced-transparency: reduce) { .toolbar, .fbar, .day-bar { background: var(--bg) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; } }
+.toolbar-inner { padding: 8px 20px; display: grid; gap: 6px; }
+/* 篩選景點：只在景點清單，放在清單欄最上面、捲動時黏在頂端列（手機是地圖）下面；一行，放不下左右滑 */
+.listcol { min-width: 0; }
+.fbar { position: sticky; top: var(--lt0, 48px); z-index: 7; margin: 0 -12px; padding: 8px 12px;
+  background: var(--bg); background: color-mix(in srgb, var(--bg) 80%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); border-bottom: 1px solid var(--rule); }
+@media (min-resolution: 2dppx) { .fbar { border-bottom-width: .5px; } }
+.fbar[hidden] { display: none; }
+@media (min-width: 960px) { .fbar { margin: 0; padding: 8px 20px; } }
+.tb-row { display: flex; gap: 8px; align-items: center; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tb-row::-webkit-scrollbar { display: none; }
+.tb-row.more { mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.tb-row > * { flex: none; }
+.tb-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.tb-sep { width: 1px; height: 18px; background: var(--rule); }
+/* 檢視：分段控制，選中的那段是浮起來的白底 */
+.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--seg-track); }
+.tab { font: inherit; font-size: 14px; font-weight: 500; border: 0; background: none; color: var(--ink); padding: 4px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background-color .2s ease, box-shadow .2s ease; }
+.tab[aria-selected="true"] { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.16), 0 0 0 .5px rgba(0,0,0,.06); font-weight: 600; }
+.tab .tag { font-size: 11px; margin-left: 6px; color: var(--accent); font-weight: 600; }
+/* 篩選按鈕：選中是淡藍底＋藍字（不反白，深色模式才不刺眼） */
+.chipbtn, .tiersel { font: inherit; font-size: 13px; line-height: 1.5; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+.chipbtn { display: inline-flex; align-items: center; gap: 4px; transition: background-color .2s ease, border-color .2s ease, color .2s ease; }
+.chipbtn .ic { width: 14px; height: 14px; }
+.chipbtn .n { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chipbtn[aria-pressed="true"], .tiersel.on { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 50%, var(--rule)); color: var(--accent); font-weight: 600; }
+.chipbtn[aria-pressed="true"] .n { color: inherit; opacity: .8; }
+.chipbtn:disabled { opacity: .38; cursor: default; }
+.chipbtn.clear { border-color: color-mix(in srgb, var(--accent) 50%, var(--rule)); color: var(--accent); }
+.selwrap { position: relative; display: inline-flex; }
+.tiersel { appearance: none; -webkit-appearance: none; padding-right: 26px; }
+.selwrap .ic { position: absolute; right: 9px; top: 50%; width: 12px; height: 12px; transform: translateY(-50%); pointer-events: none; color: var(--muted); }
+.cats { display: flex; gap: 6px; align-items: center; }
+.maptoggle { display: none; }
+
+/* ── 主畫面 ── */
+main { padding: 0 12px 40px; display: grid; grid-template-columns: minmax(0, 1fr); }
+#list { overflow-anchor: none; }
+.list { display: grid; gap: 14px; padding-top: 12px; }
+.mapwrap { position: sticky; top: var(--tb, 84px); z-index: 900; margin: 0 -12px; background: var(--bg); }
+#map { height: 36vh; min-height: 200px; border-bottom: 1px solid var(--rule); background: var(--sea); }
+@media (min-width: 960px) {
+  /* 桌面：地圖滿版貼齊篩選列和左緣、高度填滿畫面，清單欄寬度有上限 */
+  main { padding: 0; grid-template-columns: minmax(0, 1fr) clamp(380px, 42vw, 620px); align-items: start; }
+  .mapwrap { margin: 0; z-index: auto; height: calc(100vh - var(--tb, 96px)); height: calc(100dvh - var(--tb, 96px)); border-right: 1px solid var(--rule); }
+  #map { height: 100%; border-bottom: 0; }
+  .list { padding: 12px 20px 40px; }
+}
+
+/* ── 卡片 ── */
+.tier { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 999px; padding: 2px 10px 2px 8px; font-size: 13px; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-left-width: 6px; border-radius: 12px; overflow: hidden; display: grid; grid-template-columns: 1fr; scroll-margin-top: calc(var(--lt, 96px) + var(--pin-h) + 8px); position: relative; }
+/* 選中的卡片：淡淡的強調色，和地圖上放大的圖釘同步 */
+.card.focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--rule)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), 0 14px 32px -16px rgba(0,0,0,.45); }
+.card figure, .mini figure { margin: 0; position: relative; background: var(--land-dim); }
+.card img, .mini img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.mini img { aspect-ratio: 12 / 5; }  /* 小卡展開後的照片矮一半 */
+.card figcaption, .mini figcaption { font-size: 11px; color: var(--muted); padding: 4px 12px 0; line-height: 1.4; }
+.card figcaption a, .mini figcaption a { color: inherit; }
+.body { padding: 12px 16px 16px; display: grid; gap: 8px; }
+.mini .body { padding: 10px 14px 14px; }
+.head { display: flex; gap: 10px; align-items: baseline; }
+.num { flex: none; font-family: var(--font-display); font-weight: 700; font-size: 15px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--t3); transform: translateY(-2px); }
+.card h3 { font-family: var(--font-display); font-size: 19px; line-height: 1.35; margin: 0; text-wrap: balance; }
+.card h3 small { font-family: var(--font-body); font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.chip { border: 1px solid var(--rule); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+/* 我的行程 ⇄ 景點清單：跳到同一個點在另一頁的位置 */
+.chips .jump { font: inherit; font-size: 12px; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--rule)); border-radius: 999px; padding: 1px 10px; background: none; color: var(--accent); font-weight: 600; cursor: pointer; }
+.chips .jump:active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* 跳過來的那一列閃一下外框 */
+@keyframes jumpflash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
+.mini.flash { animation: jumpflash 1.6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .mini.flash { animation: none; outline: 2px solid var(--accent); } }
+.chip.opt { border-style: dashed; }
+.chip.cat { color: var(--ink); }
+.chip.cat .ic { width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; }
+.facts { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; font-size: 12px; color: var(--muted); }
+.facts dt { font-weight: 700; }
+.facts dd { margin: 0; }
+.ratings { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.rbox { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.rbox .k { color: var(--muted); font-size: 12px; display: block; }
+.rbox .v { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.rbox .def { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.stars { letter-spacing: 1px; }
+.stars .off { opacity: .22; }
+.why { color: var(--muted); }
+.card p, .mini p { margin: 0; }
+.season-note { border-left: 3px solid var(--rule); padding-left: 10px; }
+.src { font-size: 12px; color: var(--muted); }
+.maplinks { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.maplinks a { font-weight: 600; text-decoration: none; padding: 6px 0; }
+/* 「Google 地圖 ↗」放在每天大標題第一行的右邊，和日期同一行，不另外佔一行 */
+.dn { display: flex; align-items: baseline; gap: 8px; }
+.gdir { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; padding: 2px 0; }
+.gdir:hover { text-decoration: underline; }
+.src a { color: var(--muted); }
+.day { display: grid; gap: 10px; scroll-margin-top: calc(var(--lt, 96px) + 8px); }
+.day + .day { margin-top: 14px; }
+.day-head { background: var(--surface); border: 1px solid var(--rule); border-left: 6px solid var(--accent); border-radius: 12px; padding: 10px 14px; cursor: pointer; display: grid; gap: 2px; scroll-margin-top: calc(var(--lt, 96px) + 8px); transition: background-color .3s ease; }
+/* 精簡天數列：這天長到一個畫面放不下時才用。固定在清單頂端，大標題捲到它後面時漸漸出現，被下一天推走時漸漸消失。
+   漸變跟著捲動位置走（--pe 底色、--pt 文字，dayPins() 算）；不佔版面（大標題用負邊距疊回），出現消失不會讓清單跳 */
+.day-bar { contain: inline-size; position: sticky; top: var(--lt, 96px); z-index: 6; height: var(--pin-h); box-sizing: border-box;
+  /* 左右都延伸到清單欄的邊：卡片的選取外框和陰影不會從旁邊露出來 */
+  margin: 0 -20px; padding: 0 20px;
+  display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; cursor: pointer;
+  /* 半透明毛玻璃，和篩選列同一個底色 */
+  background: var(--bg); background: color-mix(in srgb, var(--bg) 80%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8);
+  opacity: var(--pe, 0); pointer-events: none; transition: opacity .14s linear, background-color .2s ease; }
+/* 底邊：一條細線，加上這天讀到哪裡的進度（強調色，從左往右長） */
+.day-bar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--rule); }
+.day-bar::after { content: ""; position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--accent); transform-origin: left center; transform: scaleX(var(--prog, 0)); transition: transform .14s linear; }
+@media (min-resolution: 2dppx) { .day-bar::before { height: .5px; } }
+.day-bar > * { opacity: var(--pt, 0); transform: translateY(calc((1 - var(--pt, 0)) * 3px)); transition: opacity .14s linear, transform .14s linear, color .2s ease; }
+.day-bar + .day-head { margin-top: calc(-1 * var(--pin-h) - 10px); }
+.day-bar.on { pointer-events: auto; }
+.day-bar.on:hover .pu { color: var(--accent); }
+.day-bar.on:active { background-color: color-mix(in srgb, var(--bg) 88%, var(--ink)); }
+/* 字的層次：天數（強調色、小）→ 標題（主角）→ 日期（次要、靠右） */
+.day-bar .pn { flex: none; font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--accent); }
+.day-bar .pt { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--ink); }
+.day-bar .pd { flex: none; margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.day-bar .pu { flex: none; width: 15px; height: 15px; color: var(--muted); margin-right: -2px; }
+.day.active .day-head { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.dn { font-size: 13px; font-weight: 700; color: var(--accent); }
+.dn .dd { color: var(--ink); font-weight: 500; }
+.day-title { font-family: var(--font-display); font-size: 20px; line-height: 1.35; margin: 0; text-wrap: balance; }
+.day-meta { font-size: 13px; color: var(--muted); }
+.badge { border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 0 6px; font-size: 11px; white-space: nowrap; }
+.day-note { margin: 4px 0 0; font-size: 14px; }
+.again { margin: 0; font-size: 13px; color: var(--muted); padding: 6px 12px; border: 1px dashed var(--rule); border-radius: 10px; }
+.near-empty { font-size: 13px; color: var(--muted); border: 1px dashed var(--rule); border-radius: 10px; padding: 14px 16px; }
+.near-head { font-size: 13px; color: var(--muted); margin: 4px 0 -4px 4px; scroll-margin-top: calc(var(--lt, 96px) + var(--pin-h) + 8px); }
+.mini { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; scroll-margin-top: calc(var(--lt, 96px) + var(--pin-h) + 8px); overflow: hidden; position: relative; }
+/* 選中的小卡：左側細色條，畫在最上層（不用 inset 陰影），照片才蓋不掉 */
+.mini::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: 0; z-index: 2; pointer-events: none; }
+.mini.focus::before { opacity: 1; }
+.mini > summary { list-style: none; display: flex; gap: 10px; align-items: center; padding: 7px 12px; cursor: pointer; }
+.mini > summary::-webkit-details-marker { display: none; }
+.mini .g { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2.5px solid var(--c); color: var(--ink); }
+.mini .g .ic { width: 15px; height: 15px; }
+.mini .gstay { border-radius: 8px; border: 0; background: var(--stay); color: var(--stay-ink); }
+.mini .mt { min-width: 0; flex: 1; line-height: 1.35; }
+.mini .mt b { font-size: 15px; }
+.mini .mt small { color: var(--muted); margin-left: 6px; font-size: 12px; }
+.mini .ms { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini[open] .ms .sum { display: none; }  /* 展開後下面就有粗體摘要，不重複 */
+.mini .chev { flex: none; width: 18px; height: 18px; color: var(--muted); transition: transform .2s ease; }
+.mini[open] .chev { transform: rotate(180deg); }
+/* 星號（想去）：線條星，按下變實心藍星（藍＝使用者的選擇） */
+.star { flex: none; display: grid; place-items: center; width: 36px; height: 36px; margin: -4px -6px -4px -2px; padding: 0; border: 0; background: none; color: var(--muted); border-radius: 50%; cursor: pointer; transition: color .15s ease, transform .15s ease; }
+.star svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.star[aria-pressed="true"] { color: var(--accent); }
+.star[aria-pressed="true"] svg { fill: currentColor; }
+.star:active { transform: scale(.86); }
+.star:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.head .star { margin: -6px -8px 0 auto; align-self: flex-start; }
+.mini .where { color: var(--ink); font-weight: 600; }
+.mini .where.out { color: var(--muted); font-weight: 400; }
+.mk .pin.starred::before { content: "★"; position: absolute; right: -8px; top: -9px; font: 700 12px/1 var(--font-body); color: var(--accent); text-shadow: 0 0 2px var(--surface), 0 0 2px var(--surface), 0 0 3px var(--surface); pointer-events: none; }
+.mk.st-dot .pin.starred::before { display: block; right: -7px; top: -8px; font-size: 10px; }
+.chipbtn.starchip .ic { fill: currentColor; stroke: none; }
+/* 景點清單：用 grid，不換行的摘要才不會把欄位撐寬 */
+.lv { display: grid; gap: 10px; min-width: 0; contain: inline-size; }
+.lv-head { cursor: default; }
+.lv-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; }
+.lv-actions .chipbtn { font-size: 13px; }
+.lv-sync { font-size: 12px; color: var(--muted); }
+.lv-copy { width: 100%; min-height: 120px; margin-top: 8px; font: 12px/1.5 ui-monospace, monospace; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 8px; padding: 8px; box-sizing: border-box; }
+.near-head .gs { color: var(--accent); margin-left: 6px; }
+/* 縣名：點一下收合／展開（存在 localStorage <前綴>-folded） */
+.near-head.grp-h { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 40px; margin: 0 0 -6px; padding: 4px 8px 4px 4px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--muted); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.grp-h .chev { flex: none; width: 16px; height: 16px; transition: transform .2s ease; }
+.grp-h[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.grp-h .gn { color: var(--ink); font-weight: 600; }
+.grp-h .gs { margin-left: 0; }
+.grp-h .gs:empty, .grp-h .gp:empty { display: none; }
+.grp-h .gp { margin-left: -6px; }
+.grp-h .gp::before { content: "・"; }
+.grp-h:active { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.grp-h:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.grp-b { display: grid; gap: 10px; }
+.grp-b[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .grp-h .chev { transition: none; } }
+.mini.focus { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 45%, var(--rule)); box-shadow: 0 8px 22px -14px rgba(0,0,0,.45); }
+.mini .mbody { border-top: 1px solid var(--rule); }
+.mini.stay { border-style: dashed; }
+.excluded { background: var(--surface); border: 1px dashed var(--rule); border-radius: 12px; padding: 12px 16px; }
+.excluded h3 { margin: 0 0 6px; font-size: 15px; }
+.excluded button { font: inherit; font-size: 13px; background: none; border: 1px solid var(--rule); color: var(--ink); border-radius: 999px; padding: 2px 10px; margin: 3px 4px 3px 0; cursor: pointer; }
+footer { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; font-size: 12px; color: var(--muted); }
+footer p { margin: 4px 0; }
+footer .credits { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--rule); }
+footer .sep { margin: 0 .35em; opacity: .5; }
+
+/* ── 我的行程：使用者自己拖拉排 ── */
+/* 拖曳把手：按住它拖不會捲動清單 */
+.grip { flex: none; position: relative; display: grid; place-items: center; width: 28px; height: 40px; margin: -6px -6px -6px -8px; padding: 0; border: 0; background: none; color: var(--muted); cursor: grab; touch-action: none; border-radius: 8px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.grip svg { width: 16px; height: 16px; }
+/* 看得到的把手只有 28×40，手指偏一點就變成捲動：可以按的範圍往上下撐滿那一列、左右各多一點（.mini 的 overflow 會裁掉超出列的部分） */
+.grip::after { content: ""; position: absolute; top: -20px; bottom: -20px; left: -6px; right: -4px; }
+.grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.addbtn, .morebtn { flex: none; display: grid; place-items: center; width: 36px; height: 36px; margin: -4px -6px -4px -4px; padding: 0; border: 0; background: none; color: var(--accent); border-radius: 50%; cursor: pointer; }
+.morebtn { color: var(--muted); }
+.addbtn .ic, .morebtn .ic { width: 20px; height: 20px; }
+/* 已排進行程：實心藍圓＋勾，和還沒排的 ＋ 分得出來 */
+.addbtn.done .ic { width: 22px; height: 22px; }
+.addbtn.done .ic circle { fill: currentColor; stroke: none; }
+.addbtn.done .ic path { stroke: var(--surface); stroke-width: 2.6; }
+.addbtn:active, .morebtn:active { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.mini > summary { gap: 8px; }
+.mini .g.gno { background: var(--c); color: var(--tx, #fff); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--rule); font: 700 13px/1 var(--font-display); }
+.mini .where:not(:empty)::after { content: " · "; color: var(--muted); font-weight: 400; }
+.mini .vt { color: var(--ink); font-weight: 600; }
+.mini .vt::after { content: " · "; color: var(--muted); font-weight: 400; }
+.mini.dragsrc { opacity: .35; }
+.pzone { display: grid; gap: 8px; border-radius: 12px; }
+.pstay { display: grid; border-radius: 12px; }
+.pempty, .pstay-empty { font-size: 13px; color: var(--muted); border: 1px dashed var(--rule); border-radius: 10px; padding: 10px 14px; display: flex; gap: 8px; align-items: center; min-height: 44px; }
+.pstay-empty .ic { width: 15px; height: 15px; }
+/* 拖曳中：可以放的地方用虛線框標出來，手指下面那個變淡藍 */
+body.dragging { cursor: grabbing; -webkit-user-select: none; user-select: none; }
+body.dragging .pzone, body.dragging .pstay { outline: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: 3px; }
+.pzone.over, .pstay.over { outline: 2px solid var(--accent) !important; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.pzone.over .pempty, .pstay.over .pstay-empty { border-color: var(--accent); color: var(--accent); }
+/* 插入位置：一條藍線（高度用負邊距抵掉，插進去不會讓清單跳動） */
+.dropline { position: relative; height: 3px; margin: -5.5px 0; border-radius: 2px; background: var(--accent); pointer-events: none; }
+.dropline::before { content: ""; position: absolute; left: -5px; top: -3.5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.ghost { position: fixed; left: 0; top: 0; z-index: 5000; pointer-events: none; display: flex; gap: 8px; align-items: center; max-width: 240px; padding: 6px 12px 6px 6px; border-radius: 999px;
+  background: var(--surface); color: var(--ink); border: 1.5px solid var(--accent); box-shadow: 0 12px 28px -8px rgba(0,0,0,.5); font-weight: 600; font-size: 14px; white-space: nowrap; will-change: transform; }
+.ghost span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.ghost .gg { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; border: 2.5px solid var(--c); background: var(--surface); }
+.ghost .gg .ic { width: 13px; height: 13px; }
+/* 景點清單底部的日期列：把景點拖到某一天；點一下跳到那天 */
+.tray { position: sticky; bottom: 0; z-index: 7; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  margin: 0 -20px -40px; padding: 8px 20px calc(8px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--rule); }
+.tray::-webkit-scrollbar { display: none; }
+.tray-label { flex: none; align-self: center; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.tchip { flex: none; display: grid; justify-items: center; min-width: 50px; padding: 3px 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 10px; font: inherit; font-size: 11px; line-height: 1.35; cursor: pointer; }
+.tchip b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.tchip .n { color: var(--muted); }
+.tchip.has .n { color: var(--accent); font-weight: 600; }
+.tchip.warn .n { color: var(--warn); }
+body.dragging .tray { border-top: 2px solid var(--accent); }
+body.dragging .tchip { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 45%, var(--rule)); }
+.tchip.over { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border: 1.5px solid var(--accent) !important; color: var(--accent); }
+/* 排進哪一天：底部彈出的選單（桌面是置中的小視窗） */
+.sheet-bg { position: fixed; inset: 0; z-index: 4000; background: rgba(0,0,0,.3); display: grid; place-items: end center; }
+.sheet { width: min(480px, 100%); max-height: min(80vh, 680px); display: flex; flex-direction: column; overflow: hidden; background: var(--surface); color: var(--ink); border-radius: 16px 16px 0 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 30px rgba(0,0,0,.3); }
+@media (min-width: 960px) { .sheet-bg { place-items: center; } .sheet { border-radius: 16px; } }
+.sh-top { display: flex; align-items: flex-start; gap: 8px; }
+.sheet h3 { flex: 1; margin: 4px 0 0; font-size: 17px; line-height: 1.4; }
+.sh-x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.sheet .sub { margin: 2px 0 8px; font-size: 13px; color: var(--muted); }
+.sact { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.slist { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
+.srow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--rule); }
+.srow .sd { flex: 1; min-width: 0; font-size: 14px; line-height: 1.35; }
+.srow .sd small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.srow.cur .sd { color: var(--accent); font-weight: 600; }
+.sheet button.sb { font: inherit; font-size: 13px; min-height: 34px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; white-space: nowrap; }
+.sheet button.sb.pri { border-color: color-mix(in srgb, var(--accent) 50%, var(--rule)); color: var(--accent); font-weight: 600; }
+.sheet button.sb[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.sheet button.sb.danger { color: var(--t5); border-color: color-mix(in srgb, var(--t5) 40%, var(--rule)); }
+.sheet button.sb:disabled { opacity: .45; cursor: default; }
+.srow .sno { font-size: 12px; color: var(--muted); white-space: nowrap; }
+/* 改了行程之後的提示（附「復原」） */
+.toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 3900; display: flex; gap: 12px; align-items: center; max-width: calc(100vw - 24px);
+  background: var(--ink); color: var(--bg); border-radius: 999px; padding: 8px 8px 8px 16px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  pointer-events: none; }  /* 只有「復原」可以按，提示蓋到的列照樣拖得動 */
+.toast[hidden] { display: none; }
+.toast button { pointer-events: auto; flex: none; font: inherit; font-size: 13px; font-weight: 700; border: 1px solid currentColor; background: none; color: inherit; border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.day-meta .warn { color: var(--warn); font-weight: 600; }
+.day-meta .nw { white-space: nowrap; }  /* 停留時間那段整段換行，不拆開「小時」 */
+
+/* ── 地圖 ── */
+.leaflet-container { background: var(--sea); font-family: var(--font-body); }
+svg.ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+/* 底圖：OpenStreetMap 資料畫成的圖磚（base/tiles/，basemap_tiles.py 產生，不含文字）＋縣界、縣名、地名 */
+/* 圖磚是 4×4 拼成的大圖的一塊（背景圖位移）。分數縮放時圖磚之間會露出細縫：每塊多蓋 0.6px 到鄰居上面（大圖右、下多留了 4px） */
+.basetile .leaflet-tile { width: 256.6px !important; height: 256.6px !important; background-repeat: no-repeat; }
+path.pref-border { stroke: var(--border-line); stroke-width: 1; stroke-dasharray: 3 3; fill: none; stroke-opacity: .9; }
+.city span, .pref-name span { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
+  text-shadow: 0 0 2px var(--halo), 0 0 3px var(--halo), 0 0 4px var(--halo); }
+.pref-name span { font-family: var(--font-display); font-size: 12px; letter-spacing: .35em; color: var(--muted); opacity: .8; }
+/* 地名（市町）：灰色細字，不搶景點名稱（深色粗字）的焦點；縣廳所在地拉開字距。字的大小固定，不隨縮放變 */
+.city span { font-size: 11px; font-weight: 400; color: var(--city); transform: translate(-50%, calc(-50% + var(--oy, 0px))); }
+.city.t1 span { font-size: 12px; font-weight: 500; letter-spacing: .12em; }
+.city.t2 span { font-size: 12px; }
+.city.clash, .pref-name.clash { visibility: hidden; }  /* 被景點、景點名稱擋到，或和更重要的地名重疊，就先藏起來 */
+/* 每天的路線（藍）：換天時粗細、透明度漸變（CSS 蓋過 Leaflet 寫在 SVG 屬性上的值） */
+path.dayline { transition: stroke-width .3s ease, stroke-opacity .3s ease; }
+path.dayline.casing { stroke-width: 6px; stroke-opacity: .85; }
+path.dayline.line { stroke-width: 3px; stroke-opacity: .95; }
+path.dayline.casing.on { stroke-width: 8px; }
+path.dayline.line.on { stroke-width: 4.5px; }
+path.dayline.dim { stroke-opacity: .55; }  /* 其他天淡一點但看得到全程 */
+/* 圖釘：行程裡的景點＝實心編號；還沒排的＝白底＋類別符號（外圈＝推薦度）；住宿＝深灰方框床。
+   擠在一起時次要的縮成小點、重疊的主要景點合成「16·17」；名稱放得下才顯示 */
+.mk { width: 0 !important; height: 0 !important; }
+.mk .pin { position: absolute; left: 0; top: 0; width: var(--sz); height: var(--sz); box-sizing: border-box; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  transform: translate(-50%, -50%) scale(var(--sc, 1)); }
+.mk .pin.main { background: var(--c); color: var(--tx); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); font: 700 13px/1 var(--font-display); white-space: nowrap; }
+.mk .pin.main.multi { border-radius: 999px; width: auto; min-width: var(--sz); padding: 0 6px; font-size: 12px; letter-spacing: .02em; }
+.mk .pin.near { background: var(--surface); color: var(--ink); border: 2px solid var(--c); box-shadow: 0 1px 2px rgba(0,0,0,.28); }
+.mk .pin.near .ic { width: 12px; height: 12px; }
+.mk .pin.near.pool { border-style: dashed; }
+.mk .pin.stay { border-radius: 6px; background: var(--stay); color: var(--stay-ink); border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.mk .pin.stay .ic { width: 12px; height: 12px; }
+.mk .pin.home { background: var(--stay); color: var(--stay-ink); font-family: var(--font-body); font-size: 12px; }
+.mk.st-small .pin { --sc: .72; }
+.mk.st-dot .pin { width: 9px; height: 9px; border: 1.5px solid #fff; background: var(--c); box-shadow: 0 0 1px rgba(0,0,0,.5); }
+.mk.st-dot .pin > * { display: none; }
+.mk.st-hide { display: none; }
+/* 放到最大還擠的點：符號挪到旁邊，細線（leads 層，在所有圖釘下面）連回實際位置 */
+.lead-mk { width: 0 !important; height: 0 !important; }
+.lead { position: absolute; left: 0; top: 0; width: var(--dl); height: 0; border-top: 1.5px solid var(--ink); opacity: .55; transform-origin: 0 0; transform: translateY(-.75px) rotate(var(--da)); pointer-events: none; }
+.lead::before { content: ""; position: absolute; left: -3.5px; top: -4.25px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--ink); border: 1.5px solid var(--surface); }
+.mk.spread .pin, .mk.spread .plabel { translate: var(--dx) var(--dy); }
+.mk .pin.hl { --sc: 1.2; }
+.mk .pin.focus { --sc: 1.3; opacity: 1; }
+.mk .pin.focus::after { content: ""; position: absolute; inset: -8px; border-radius: inherit; border: 2.5px solid var(--accent); animation: halo 1.6s ease-out infinite; pointer-events: none; }
+.mk .pin.stay.focus::after { border-radius: 10px; }
+@keyframes halo { 0% { transform: scale(.75); opacity: .95; } 100% { transform: scale(1.55); opacity: 0; } }
+/* 名稱：Google 地圖式的描邊字（沒有框），放在圖釘右、左、下、上其中一個放得下的位置 */
+.plabel { position: absolute; left: 0; top: 0; display: none; white-space: nowrap; pointer-events: none; font: 600 12px/1.25 var(--font-body); color: var(--ink);
+  text-shadow: 0 0 2px var(--halo), 0 0 2px var(--halo), 0 0 3px var(--halo), 0 0 4px var(--halo); }
+.mk.k-near .plabel { font-weight: 500; font-size: 11px; }
+.mk.is-focus .plabel { font-weight: 700; font-size: 13px; }
+.mk.lb-r .plabel { display: block; transform: translate(calc(var(--rx) + 4px), -50%); }
+.mk.lb-l .plabel { display: block; transform: translate(calc(-100% - var(--rx) - 4px), -50%); }
+.mk.lb-b .plabel { display: block; transform: translate(-50%, calc(var(--ry) + 2px)); }
+.mk.lb-t .plabel { display: block; transform: translate(-50%, calc(-100% - var(--ry) - 2px)); }
+@media (prefers-reduced-motion: reduce) { .mk .pin.focus::after { animation: none; opacity: .9; } }
+/* 地圖控制項：右上一欄（全程／這天、放大縮小），圖例左下、出處右下 */
+.mapctl { display: grid; gap: 8px; }
+.mc-group { display: grid; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.18); overflow: hidden; }
+.mc-group button { font: inherit; font-size: 12px; font-weight: 600; width: 44px; height: 38px; border: 0; background: none; color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+.mc-group button + button { border-top: 1px solid var(--rule); }
+.mc-group button:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.mc-group button:not(:disabled):active { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.mc-group button .ic { width: 16px; height: 16px; }
+.maplegend, .mapinfo { background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.18); font-size: 12px; line-height: 1.5; }
+.maplegend > button, .mapinfo > button { font: inherit; font-size: 12px; font-weight: 600; background: none; border: 0; color: var(--ink); padding: 6px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.maplegend > button .ic { width: 12px; height: 12px; transition: transform .2s ease; }
+.maplegend > button[aria-expanded="true"] .ic { transform: rotate(180deg); }
+.lg-panel { padding: 0 12px 10px; display: grid; gap: 6px; color: var(--muted); max-width: 340px; }
+.lg-panel[hidden], .mapinfo .attr[hidden] { display: none; }
+.lg-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.lg-row span { display: inline-flex; align-items: center; gap: 5px; }
+.lg-row i { display: inline-block; flex: none; }
+.lg-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 25%, transparent); }
+.lg-num { width: 18px; height: 18px; border-radius: 50%; display: inline-grid !important; place-items: center; font-style: normal; font-size: 10px; font-weight: 700; color: var(--accent-ink); background: var(--muted); border: 1.5px solid #fff; }
+.lg-near { width: 18px; height: 18px; border-radius: 50%; display: inline-grid !important; place-items: center; background: var(--surface); border: 2px solid var(--muted); color: var(--ink); }
+.lg-sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); border: 1.5px solid #fff; }
+.lg-stay { width: 18px; height: 18px; border-radius: 5px; display: inline-grid !important; place-items: center; background: var(--stay); color: var(--stay-ink); }
+.lg-near .ic, .lg-stay .ic { width: 10px; height: 10px; }
+.lg-near.pool { border-style: dashed; }
+.lg-starred { color: var(--accent); font-style: normal; font-weight: 700; }
+.lg-line { width: 22px; height: 4px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 1.5px var(--surface); }
+.lg-line.dim { opacity: .55; }
+.lg-road, .lg-nat { width: 22px; height: 3px; border-radius: 2px; background: var(--road); box-shadow: 0 0 0 1px var(--road-case); }
+.lg-nat { background: var(--nat); box-shadow: 0 0 0 1px var(--nat-case); }
+.lg-rail { width: 22px; height: 2px; background: var(--rail); }
+.mapinfo > button { font-weight: 500; color: var(--muted); padding: 2px 8px; font-size: 11px; }
+.mapinfo .attr { padding: 0 10px 6px; color: var(--muted); font-size: 11px; max-width: 260px; }
+.leaflet-control-attribution { display: none; }
+
+/* 手機：地圖固定在篩選列下方（放在最後，蓋過前面的設定） */
+@media (max-width: 959px) {
+  .toolbar-inner { padding: 6px 12px; }
+  .day-bar { margin: 0 -12px; padding: 0 12px 0 14px; gap: 8px; }
+  .day-bar .pt { font-size: 16px; }
+  .mc-zoom { display: none; }       /* 手機用兩指縮放 */
+  .tray { margin: 0 -12px -40px; padding-left: 12px; padding-right: 12px; }
+  .mc-group button { width: 40px; height: 34px; }
+  .lg-panel { max-width: 240px; }
+  body.map-hidden .mapwrap { display: none; }
+  .maptoggle { display: inline-block; font: inherit; font-size: 13px; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--rule)); color: var(--accent); background: var(--surface); border-radius: 999px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } .day-bar, .day-bar > *, .day-bar::after, path.dayline { transform: none; transition: none; }
+  .day-bar::after { transform: scaleX(var(--prog, 0)); } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><!--__HEADING__--></h1>
+  <p class="lede"><!--__DATES__-->從「景點清單」「住宿清單」把想去的地方拖進日期，在「我的行程」排出每一天。</p>
+  <div class="summary" id="summary"></div>
+  <ul class="notes" id="notes"></ul>
+</header>
+<div class="toolbar" id="toolbar">
+  <div class="toolbar-inner">
+    <div class="tb-row">
+      <button type="button" class="maptoggle" id="maptoggle" aria-pressed="true">收起地圖</button>
+      <div class="seg" role="tablist" aria-label="檢視方式" id="views"><button type="button" class="tab" id="view-days" role="tab">我的行程</button><button type="button" class="tab" id="view-list" role="tab">景點清單</button><button type="button" class="tab" id="view-hotels" role="tab">住宿清單</button></div>
+    </div>
+  </div>
+</div>
+<main>
+  <div class="mapwrap"><div id="map" role="region" aria-label="路線地圖"></div></div>
+  <div class="listcol">
+    <div class="fbar" id="fbar" hidden>
+      <div class="tb-row" role="group" aria-label="篩選景點">
+        <span class="selwrap"><select class="tiersel" id="tiersel" aria-label="推薦度"></select><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+        <span id="shown" aria-live="polite" hidden></span>
+        <span class="tb-sep" aria-hidden="true"></span>
+        <div class="cats" id="cats"></div>
+      </div>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+</main>
+<footer>
+  <p><!--__DRIVE_NOTE__--></p>
+  <p>評分查詢於 <span id="asof"></span>：<!--__RATINGS_NOTE__--></p>
+  <p class="credits">照片 Wikimedia Commons，作者與授權見各照片<span class="sep" aria-hidden="true">・</span>底圖 <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap 貢獻者</a>（ODbL），<a href="https://protomaps.com/">Protomaps</a> <span id="tiles-date"></span> 版，Claude 繪製<span class="sep" aria-hidden="true">・</span>山影 <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles on AWS</a>（Mapzen）<!--__CREDITS__--></p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const DATA = /*__DATA__*/null;
+const GEO = /*__GEO__*/null;
+const LABELS = /*__LABELS__*/null;
+const byId = Object.fromEntries(DATA.spots.map(s => [s.id, s]));
+// 這趟旅程的設定（map/config.json）：localStorage 鍵名前綴、旅行季節的說法、地區的叫法
+const PAGE = DATA.page, SK = PAGE.storage + "-", SEASON = PAGE.season, RW = PAGE.texts.region_word;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// 字型和精簡列高度不會在捲動中改變：快取起來，排版和捲動時不必每次讀樣式
+const cssCache = {};
+const cssC = n => cssCache[n] !== undefined ? cssCache[n] : (cssCache[n] = css(n));
+const TIER = {5: "必去", 4: "推薦", 3: "有空再去", 2: "可略過", 1: "不建議"};
+// 季節推薦度看「這個季節值不值得專程去」，和評分網站的整年口碑是兩回事；每級的說明在地圖設定 season.tiers
+const TIER_DEF = PAGE.tiers;
+const SIZE = {5: 34, 4: 30, 3: 26, 2: 22, 1: 20};
+const CATS = DATA.cats;  // [[key, 字, 名稱], ...]
+const CAT = Object.fromEntries(CATS.map(c => [c[0], c]));
+const glyph = s => CAT[s.cats[0]][1];
+// 類別符號（線條圖示，24×24）
+// 精簡列放不下假日名稱：「1/1（四・元日）」→「1/1（四）」
+const shortDate = t => t.replace(/（(.)・[^）]*）/, "（$1）");
+const CHEV = '<svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+const CHEV_UP = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>';
+const PIN_UP = '<svg class="pu" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10l4-4 4 4"/></svg>';
+const ICONS = {
+  castle: '<path d="M22 20v-9H2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2Z"/><path d="M18 11V4H6v7"/><path d="M15 22v-4a3 3 0 0 0-6 0v4"/><path d="M22 11V9M2 11V9M6 4V2M18 4V2M10 4V2M14 4V2"/>',
+  temple: '<path d="M3 5c6 1.4 12 1.4 18 0"/><path d="M4.5 9.5h15"/><path d="M7 6.6V21M17 6.6V21M12 9.5V6.9"/>',
+  museum: '<path d="M3 21h18M5 18h14"/><path d="M6 18v-7M10 18v-7M14 18v-7M18 18v-7"/><path d="M12 3l8 5H4z"/>',
+  onsen: '<path d="M8 3.5c-1.2 1.5 1.2 2.5 0 4M12 3c-1.2 1.6 1.2 2.8 0 4.5M16 3.5c-1.2 1.5 1.2 2.5 0 4"/><path d="M4 11h16a8 8 0 0 1-16 0z"/>',
+  nature: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/><path d="M4.1 15.1c2.6-1.6 5.2-1.4 7.9.4 2.7 1.9 5.5 2 8.2.2"/>',
+  town: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v12h14V9"/><path d="M10 21v-6h4v6"/>',
+  food: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>',
+  activity: '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 11v2M13 17v2"/>',
+  ski: '<path d="M12 2v20M2 12h20"/><path d="m20 16-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"/>',
+  animal: '<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.8 1C6.5 17.5 4.5 16.8 4.5 16.8A3.5 3.5 0 0 1 5.5 10z"/>',
+  park: '<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6l-5.4 2.9 1.2-6-4.5-4.2 6.1-.7z"/>',
+  anime: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4 4 0 0 0 7 0M9 9.5v.5M15 9.5v.5"/>',
+  base: '<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
+  car: '<path d="M19 17h2a1 1 0 0 0 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10l-2.2-2.3A2.5 2.5 0 0 0 12 7H5a1.5 1.5 0 0 0-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4a1 1 0 0 0 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+};
+// 沒有內建圖示的類別畫圓點
+const icon = (k, cls) => '<svg class="ic' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[k] || '<circle cx="12" cy="12" r="4"/>') + "</svg>";
+const BASE = /*__BASE__*/null;  // 底圖：外圍、細緻兩層圖磚的範圍、有哪些圖磚（base/tiles.json），和地名（base/places.json）
+const isDark = () => { const t = document.documentElement.getAttribute("data-theme"); return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; };
+const tierBg = j => j ? css("--t" + j) : css("--accent");
+const tierInk = j => j ? css("--t" + j + "-ink") : "#fff";
+// 租車取還車點（類別 car）不評推薦度，和住宿一樣用中性深灰（藍色只代表介面和使用者的選擇）
+const isCar = s => s.cats[0] === "car";
+const spotBg = s => isCar(s) ? css("--stay") : tierBg(s.tier), spotInk = s => isCar(s) ? css("--stay-ink") : tierInk(s.tier);
+// 地圖上的名稱：地點的 short_name，沒寫就是名稱去掉括號
+const short = s => s.label || s.name.replace(/（.*?）/g, "");
+const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+let minTier = 1, catOn = new Set();
+try { minTier = Number(localStorage.getItem(SK + "min-tier")) || 1; catOn = new Set(JSON.parse(localStorage.getItem(SK + "cats") || "[]").filter(k => k in CAT && k !== "base")); } catch (e) {}
+
+document.getElementById("asof").textContent = DATA.as_of;
+document.getElementById("tiles-date").textContent = BASE.tiles.date;
+// 底圖兩層圖磚：外圍（拉遠看全程）上面疊細緻（景點所在的地區）
+const FB = BASE.fine, FBOUNDS = [[FB.south, FB.west], [FB.north, FB.east]];
+const WB = BASE.wide, WBOUNDS = [[WB.south, WB.west], [WB.north, WB.east]];
+const map = L.map("map", { zoomControl: false, attributionControl: false, minZoom: 4, maxZoom: 12, zoomSnap: 0.25, zoomDelta: 0.5,
+  maxBounds: WBOUNDS, maxBoundsViscosity: 1 }).setView([PAGE.view.lat, PAGE.view.lon], PAGE.view.zoom);
+// 最小縮放＝外圍底圖剛好填滿地圖框，不會看到底圖邊緣
+const fitMinZoom = () => { map.setMinZoom(Math.ceil(map.getBoundsZoom(WBOUNDS, true) * 4) / 4); };
+// 圖層順序：底圖圖磚（Leaflet 的 tilePane）< 縣界 < 縣名・地名 < 路線 < 圖釘（地名是底圖的一部分，景點的小圓點也要畫在地名上面）
+[["basevec", 250], ["cities", 350], ["leads", 550]].forEach(([n, z]) => { map.createPane(n).style.zIndex = z; });
+map.getPane("cities").style.pointerEvents = "none"; map.getPane("leads").style.pointerEvents = "none";
+const baseRenderer = L.svg({ pane: "basevec" });
+// 縮放分級：遠看時還沒排的點縮成小點，近看才顯示名稱
+function zoomCls() {
+  const z = map.getZoom(), c = map.getContainer().classList;
+  c.toggle("z-low", z < 7.25); c.toggle("z7", z >= 7); c.toggle("z8", z >= 8); c.toggle("z9", z >= 9); c.toggle("z10", z >= 10);
+}
+map.on("zoomend", zoomCls);
+let baseLayers = [], dayLayers = [], pinLayer, pinIndex = {}, cityMarks = [];
+// 底圖圖磚：每 A×A 張拼成一張大圖（artifact 檔案數有上限），每張圖磚是一個 div、背景用大圖位移到那一塊。
+// 全是海的大圖沒有存檔（tiles.json 的 have 沒列），div 留空，露出地圖背景的海色
+const HAVE = new Set(Object.entries(BASE.tiles.have).flatMap(([z, l]) => l.map(k => z + "/" + k)));
+const atlasLoad = {};
+const loadAtlas = url => atlasLoad[url] || (atlasLoad[url] = new Promise(res => { const i = new Image(); i.onload = i.onerror = () => res(); i.src = url; }));
+const BaseTiles = L.TileLayer.extend({ createTile(c, done) {
+  const d = document.createElement("div"), A = BASE.tiles.atlas, r = BASE.tiles.ranges[c.z];
+  const i = r ? c.x - r[0] : -1, j = r ? c.y - r[2] : -1, ax = Math.floor(i / A), ay = Math.floor(j / A);
+  if (!r || i < 0 || j < 0 || !HAVE.has(c.z + "/" + ax + "/" + ay)) { setTimeout(() => done(null, d), 0); return d; }
+  const url = this._url.replace("{z}", c.z).replace("{a}", ax + "-" + ay);
+  d.style.backgroundImage = "url(" + url + ")"; d.style.backgroundSize = (A * 256 + 2) + "px";
+  d.style.backgroundPosition = -(i % A) * 256 + "px " + -(j % A) * 256 + "px";
+  loadAtlas(url).then(() => done(null, d));
+  return d;
+} });
+// 地名分級看「畫面涵蓋多大範圍」（度數，取經度寬、緯度高 × 1.25 較大的那個），不看縮放數字：手機、iPad、桌面看到的密度一樣。
+// 看得到整個日本：什麼都不寫；大半個日本：只有縣名；再放大：縣廳所在地 → 20 萬人以上的市 → 10 萬人以上的市 → 其他的市 → 町；看一個地區時縣名收起來
+const viewSpan = () => { const b = map.getBounds(); return Math.max(b.getEast() - b.getWest(), (b.getNorth() - b.getSouth()) * 1.25); };
+const PREF_SPAN = [3.3, 13];  // 縣名：範圍在這之間才寫
+// 地名（OSM 的市町，依重要性排好）：級別 1 縣廳所在地、2 人口 20 萬以上、3 人口 10 萬以上、4 其他的市、5 町；範圍小於 PLACE_SPAN[級別] 才寫
+const PLACE_SPAN = [0, 6.5, 4.5, 3, 2.2, .8];
+const placeLv = pl => pl.t === 1 ? 1 : pl.t === 2 ? (pl.p >= 200000 ? 2 : 3) : pl.t + 1;
+// 只放畫面附近的（標記少，iPad 縮放才順）；擺不擺得下在 layoutMap 決定
+const placeLayer = L.layerGroup().addTo(map), placeMk = new Map();
+function syncPlaces(span) {
+  const b = map.getBounds().pad(.25);
+  for (const pl of BASE.places) {
+    const want = span <= PLACE_SPAN[placeLv(pl)] && b.contains([pl.lat, pl.lon]);
+    let m = placeMk.get(pl);
+    if (want && !m) {
+      m = L.marker([pl.lat, pl.lon], { pane: "cities", interactive: false, keyboard: false,
+        icon: L.divIcon({ className: "city t" + pl.t, html: "<span>" + esc(pl.n) + "</span>", iconSize: [0, 0] }) }).addTo(placeLayer);
+      placeMk.set(pl, m);
+    } else if (!want && m) { m.remove(); placeMk.delete(pl); }
+  }
+}
+function drawBase() {
+  baseLayers.forEach(l => l.remove()); cityMarks = [];
+  const opt = (cls, extra) => Object.assign({ pane: "basevec", renderer: baseRenderer, interactive: false, className: cls }, extra || {});
+  const url = "base/tiles/" + (isDark() ? "dark" : "light") + "/{z}/{a}.webp", fz = BASE.tiles.fine_min;
+  baseLayers = [
+    new BaseTiles(url, { minNativeZoom: 4, maxNativeZoom: fz - 1, bounds: WBOUNDS, className: "basetile" }),
+    new BaseTiles(url, { minZoom: fz - .5, minNativeZoom: fz, maxNativeZoom: BASE.tiles.max, bounds: FBOUNDS, className: "basetile" }),
+    // 縣界合成一條 SVG 路徑：地圖每移動一次，Leaflet 要重新裁切、重畫每條線，條數多了整頁會卡
+    L.polygon(GEO.features.flatMap(f => f.geometry.coordinates.map(poly => poly.map(r => r.map(([x, y]) => [y, x])))), opt("pref-border", { fill: false })),
+    L.layerGroup(LABELS.map(l => { const m = L.marker([l.lat, l.lon], { pane: "cities", interactive: false, keyboard: false,
+      icon: L.divIcon({ className: "pref-name", html: "<span>" + esc(l.zh) + "</span>", iconSize: [0, 0] }) }); cityMarks.push({ m, text: l.zh, pref: true, focus: l.focus }); return m; })),
+  ];
+  baseLayers.forEach(l => l.addTo(map));
+}
+// 地圖控制項：右上一欄（全程／這天、放大／縮小）、左下圖例（可收合）、右下「© OpenStreetMap」圖資出處（點開才展開）
+const ZIN = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const ZOUT = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>';
+const MapCtl = L.Control.extend({ options: { position: "topright" }, onAdd() {
+  const d = L.DomUtil.create("div", "mapctl");
+  d.innerHTML = '<div class="mc-group"><button type="button" data-act="all" title="看整條路線">全程</button><button type="button" data-act="day" title="放大目前這一天（點過的那天；還沒點就是正在看的那天）" disabled>這天</button></div>' +
+    '<div class="mc-group mc-zoom"><button type="button" data-act="in" aria-label="放大">' + ZIN + '</button><button type="button" data-act="out" aria-label="縮小">' + ZOUT + "</button></div>";
+  L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+  d.addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.disabled) return;
+    ({ all: () => { showAll(); fitAll(); }, day: zoomHere, in: () => map.zoomIn(), out: () => map.zoomOut() })[b.dataset.act](); });
+  return d; } });
+const toggleCtl = (cls, label, body, key, dflt) => L.Control.extend({ options: { position: cls === "maplegend" ? "bottomleft" : "bottomright" }, onAdd() {
+  const d = L.DomUtil.create("div", cls);
+  let open = null; try { open = key ? localStorage.getItem(key) : null; } catch (e) {}
+  open = open === null ? dflt : open === "1";
+  d.innerHTML = '<button type="button" aria-expanded="' + open + '">' + label + "</button>" + body.replace("<div ", "<div " + (open ? "" : "hidden ") );
+  const b = d.querySelector("button"), panel = b.nextElementSibling;
+  b.addEventListener("click", () => { const o = b.getAttribute("aria-expanded") !== "true"; b.setAttribute("aria-expanded", String(o)); panel.hidden = !o;
+    try { if (key) localStorage.setItem(key, o ? "1" : "0"); } catch (e) {} scheduleLayout(); });
+  L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+  return d; } });
+const bigMap = () => { const r = document.getElementById("map").getBoundingClientRect(); return r.width >= 700 && r.height >= 600; };
+const LegendCtl = toggleCtl("maplegend", "圖例" + CHEV_UP, '<div class="lg-panel" id="legend"></div>', SK + "legend", bigMap());
+const InfoCtl = toggleCtl("mapinfo", "© OpenStreetMap", '<div class="attr">底圖：<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap 貢獻者</a>（經 <a href="https://protomaps.com/">Protomaps</a>）｜山影：Terrain Tiles on AWS' + DATA.page.credits.map(c => "｜" + esc(c.what) + "：" + esc(c.source)).join("") + "。詳見頁尾。</div>", null, false);
+map.addControl(new MapCtl()); map.addControl(new LegendCtl()); map.addControl(new InfoCtl());
+
+let activeDay = null;  // 我的行程「目前這天」：只有點選才換（點景點、大標題、精簡列、路線、「這天」），捲動不換
+// 星號＝使用者想去的點。存在 localStorage，在 claude.ai 上也同步到 artifact 資料庫（plan/stars）
+const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.3 2.65 5.4 5.95.86-4.3 4.2 1.02 5.92L12 16.9l-5.32 2.78 1.02-5.92-4.3-4.2 5.95-.86z"/></svg>';
+let starSet = new Set(), starAt = "", starOnly = false, view = "days", folded = new Set();
+// 三個檢視：我的行程、景點清單、住宿清單
+const VIEWS = ["days", "list", "hotels"], VIEW_NAME = { days: "我的行程", list: "景點清單", hotels: "住宿清單" };
+// 住宿清單裡的：旅館（lodging）和住宿地區（主要類別是 base）
+const isLodging = s => !!s.lodging || s.cats[0] === "base";
+const listOf = s => isLodging(s) ? "hotels" : "list";
+try {
+  starSet = new Set(JSON.parse(localStorage.getItem(SK + "stars") || "[]").filter(id => byId[id]));
+  starAt = localStorage.getItem(SK + "stars-at") || "";
+  starOnly = localStorage.getItem(SK + "star-only") === "1";
+  view = VIEWS.includes(localStorage.getItem(SK + "view")) ? localStorage.getItem(SK + "view") : "days";
+  folded = new Set(JSON.parse(localStorage.getItem(SK + "folded") || "[]"));
+} catch (e) {}
+
+// ── 我的行程：每天＝景點（照順序）＋今晚住哪；同一個點只排一天，住宿可以連住。
+// 存在 localStorage <前綴>-plan，在 claude.ai 上也同步到資料庫 plan/itinerary
+const TRIP = DATA.trip, HOME = TRIP.home, WD = "日一二三四五六";
+const DAYS = (() => {
+  const out = [], d = new Date(TRIP.start + "T00:00:00Z"), end = new Date(TRIP.end + "T00:00:00Z");
+  for (; d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const iso = d.toISOString().slice(0, 10), h = TRIP.holidays[iso], md = (d.getUTCMonth() + 1) + "/" + d.getUTCDate(), wd = WD[d.getUTCDay()];
+    out.push({ iso, md, wd, date: md + "（" + wd + (h ? "・" + h : "") + "）", note: TRIP.notes[iso] || "" });
+  }
+  return out;
+})();
+const LAST = DAYS.length - 1;  // 最後一天搭機回國，沒有「今晚住」
+function blankPlan() { const p = { days: {}, updated: "" }; Object.entries(TRIP.preset || {}).forEach(([iso, ids]) => { p.days[iso] = { ids: ids.slice(), stay: null }; }); return p; }
+function cleanPlan(p) {  // 只留這趟日期內、還存在的景點；同一個點只留第一次出現的那天
+  const out = { days: {}, updated: String(p && p.updated || "") }, used = new Set();
+  DAYS.forEach((d, i) => {
+    const x = p && p.days && p.days[d.iso]; if (!x) return;
+    const ids = (Array.isArray(x.ids) ? x.ids : []).filter(id => byId[id] && id !== HOME && !used.has(id) && used.add(id));
+    const stay = i < LAST && x.stay && byId[x.stay] ? x.stay : null;
+    if (ids.length || stay) out.days[d.iso] = { ids, stay };
+  });
+  return out;
+}
+let plan;
+try { const raw = localStorage.getItem(SK + "plan"); plan = raw ? cleanPlan(JSON.parse(raw)) : blankPlan(); } catch (e) { plan = blankPlan(); }
+const dayP = i => plan.days[DAYS[i].iso] || (plan.days[DAYS[i].iso] = { ids: [], stay: null });
+// 開車粗估：直線距離 × 繞路係數 ÷ 時速；直線 40 km 以上當高速公路（DATA.road）
+const RD = DATA.road, ll = id => [byId[id].lat, byId[id].lon];
+function hav(a, b) { const t = Math.PI / 180, x = Math.sin((b[0] - a[0]) * t / 2) ** 2 + Math.cos(a[0] * t) * Math.cos(b[0] * t) * Math.sin((b[1] - a[1]) * t / 2) ** 2; return 12742 * Math.asin(Math.sqrt(x)); }
+function leg(a, b) { const d = hav(a, b), [f, v] = d >= RD.express_km ? RD.express : RD.local; return [d * f, d * f / v]; }
+// 路網（草案）：roads.py 從 OpenStreetMap 抽出的主要道路＋景點接上去的小路（roads.txt），載入後每段沿路算最快路線（A*），
+// 時數用 DATA.road.net 的各級道路時速（不含塞車、天候）；載入前、接不上路網的段落照舊用直線估算
+let NET = null, ROUTES = {};
+async function loadRoads() {
+  if (!DATA.roads) return;
+  try {
+    const r = await fetch("roads.txt"); if (!r.ok) throw new Error("HTTP " + r.status);
+    // roads.py 把 base64 的數字換成符號、去掉結尾的 =（見 DIGIT_SUB），這裡換回來
+    let t = (await r.text()).trim().replace(/[-_.~!*()$,]/g, c => "-_.~!*()$,".indexOf(c));
+    t = atob(t + "===".slice((t.length + 3) % 4)); let b = new Uint8Array(t.length);
+    for (let k = 0; k < t.length; k++) b[k] = t.charCodeAt(k);
+    if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+    NET = decodeRoads(b); ROUTES = {};
+    afterPlanChange();
+  } catch (e) { console.warn("路網載入失敗，開車時數用直線估算", e); }
+}
+// 格式見 roads.py 的 write_bin：一串 varint，座標單位 1e-5 度
+function decodeRoads(b) {
+  let i = 0;
+  const uv = () => { let x = 0, m = 1, c; do { c = b[i++]; x += (c & 127) * m; m *= 128; } while (c >= 128); return x; };
+  const zz = () => { const x = uv(); return x % 2 ? -(x + 1) / 2 : x / 2; };
+  if (uv() !== 0x52445332) throw new Error("roads.txt 格式不對");
+  const N = uv(), E = uv(), lat = new Int32Array(N), lon = new Int32Array(N);
+  for (let k = 0, a = 0, o = 0; k < N; k++) { a += uv(); o += zz(); lat[k] = a; lon[k] = o; }
+  const eu = new Int32Array(E), ev = new Int32Array(E), km = new Float32Array(E), hr = new Float32Array(E), ow = new Uint8Array(E), so = new Int32Array(E + 1), sh = [];
+  const sp = RD.net.speed;
+  for (let k = 0, u = 0; k < E; k++) {
+    u += uv(); eu[k] = u; ev[k] = u + zz(); km[k] = uv() / 1000;
+    const f = uv(), c = f & 7; hr[k] = km[k] / ((f & 8) && c <= 2 ? RD.net.link : sp[c]); ow[k] = f & 16 ? 1 : 0;
+    for (let j = uv(), a = lat[u], o = lon[u]; j > 0; j--) { a += zz(); o += zz(); sh.push(a, o); }
+    so[k + 1] = sh.length / 2;
+  }
+  // 每個路口往外的路段（CSR）：k+1 是順著走，−(k+1) 是逆著走（雙向的路）
+  const off = new Int32Array(N + 1);
+  for (let k = 0; k < E; k++) { off[eu[k] + 1]++; if (!ow[k]) off[ev[k] + 1]++; }
+  for (let k = 0; k < N; k++) off[k + 1] += off[k];
+  const adj = new Int32Array(off[N]), fill = off.slice(0, N);
+  for (let k = 0; k < E; k++) { adj[fill[eu[k]]++] = k + 1; if (!ow[k]) adj[fill[ev[k]]++] = -(k + 1); }
+  return { N, lat, lon, eu, ev, km, hr, so, sh: Int32Array.from(sh), off, adj, vmax: Math.max(...sp, RD.net.link) };
+}
+// 兩個點之間沿路的最快路線：{km, h, line}；有一端接不上路網就回傳 null。結果記住，路網或景點沒變就不重算
+function netRoute(a, b) {
+  const key = a + ">" + b; if (key in ROUTES) return ROUTES[key];
+  const G = NET, s = DATA.roads.snap[a], g = DATA.roads.snap[b];
+  if (s === undefined || g === undefined) return ROUTES[key] = null;
+  const ends = [ll(a), ll(b)], nll = n => [G.lat[n] / 1e5, G.lon[n] / 1e5];
+  // 景點到它接上的路口：直線，用生活道路的時速
+  const tail = hav(ends[0], nll(s)) + hav(ends[1], nll(g));
+  const res = { km: tail, h: tail / RD.net.speed[5], line: [ends[0]] };
+  if (s !== g) {
+    const dist = new Float64Array(G.N).fill(Infinity), via = new Int32Array(G.N), gl = nll(g), cg = Math.cos(gl[0] * Math.PI / 180);
+    const hh = n => Math.hypot((G.lat[n] / 1e5 - gl[0]) * 111.2, (G.lon[n] / 1e5 - gl[1]) * 111.2 * cg) / G.vmax;
+    const hp = [], hk = [];  // 二元堆積：hp 是優先值，hk 是路口
+    const push = (p, n) => { let j = hp.length; hp.push(p); hk.push(n); while (j) { const q = (j - 1) >> 1; if (hp[q] <= p) break; hp[j] = hp[q]; hk[j] = hk[q]; j = q; } hp[j] = p; hk[j] = n; };
+    const pop = () => { const n = hk[0], lp = hp.pop(), ln = hk.pop(); if (hp.length) { let j = 0; for (;;) { let c = 2 * j + 1; if (c >= hp.length) break; if (c + 1 < hp.length && hp[c + 1] < hp[c]) c++; if (hp[c] >= lp) break; hp[j] = hp[c]; hk[j] = hk[c]; j = c; } hp[j] = lp; hk[j] = ln; } return n; };
+    dist[s] = 0; push(hh(s), s);
+    while (hp.length) {
+      const n = pop(); if (n === g) break;
+      for (let j = G.off[n]; j < G.off[n + 1]; j++) {
+        const e = G.adj[j], k = Math.abs(e) - 1, m = e > 0 ? G.ev[k] : G.eu[k], d = dist[n] + G.hr[k];
+        if (d < dist[m]) { dist[m] = d; via[m] = e; push(d + hh(m), m); }
+      }
+    }
+    if (dist[g] === Infinity) return ROUTES[key] = null;
+    const seq = [];
+    for (let n = g; n !== s;) { const e = via[n], k = Math.abs(e) - 1; seq.push(e); n = e > 0 ? G.eu[k] : G.ev[k]; }
+    res.line.push(nll(s));
+    for (let q = seq.length - 1; q >= 0; q--) {
+      const e = seq[q], k = Math.abs(e) - 1, pts = [];
+      for (let j = G.so[k]; j < G.so[k + 1]; j++) pts.push([G.sh[2 * j] / 1e5, G.sh[2 * j + 1] / 1e5]);
+      if (e < 0) pts.reverse();
+      res.line.push(...pts, nll(e > 0 ? G.ev[k] : G.eu[k])); res.km += G.km[k]; res.h += G.hr[k];
+    }
+  }
+  res.line.push(ends[1]);
+  return ROUTES[key] = res;
+}
+// 開車區段：只有取車點（pickup）到還車點（dropoff）之間畫路線、算開車時數。
+// 回傳 [第幾天, 這天的第幾站]；站的編號 0 是前一晚住處，景點從 1 起，最後是今晚住處。
+// 只看車點、不看日期：取車點沒排進行程就從第一天開頭算，還車點沒排就算到最後一天
+function carSpan() {
+  const at = flag => { for (let i = 0; i < DAYS.length; i++) { const p = plan.days[DAYS[i].iso], k = p ? p.ids.findIndex(id => byId[id].rental === flag) : -1; if (k >= 0) return [i, k + 1]; } return null; };
+  return { from: at("pickup") || [0, 0], to: at("dropoff") || [LAST, Infinity] };
+}
+// PI：每天的路線點（前一晚住的地方 → 景點 → 今晚住）、開車估算，每個點排在哪天、第幾站
+let PI = null;
+function planInfo() {
+  const info = { days: [], dayOf: {}, noOf: {}, stayDays: {}, n: 0, km: 0, h: 0, over: 0, stays: 0, must: 0 };
+  let pos = ll(HOME), posId = HOME, no = 0;
+  const span = carSpan();
+  DAYS.forEach((d, i) => {
+    const p = plan.days[d.iso] || { ids: [], stay: null };
+    const all = [posId].concat(p.ids); if (p.stay) all.push(p.stay);
+    const allPts = [pos].concat(p.ids.map(ll)); if (p.stay) allPts.push(ll(p.stay));
+    // 這天開車的那段：取車那天從取車點起（之前坐電車），還車那天到還車點為止（之後坐計程車、電車）；租車以外的日子不開車
+    const car = i >= span.from[0] && i <= span.to[0];
+    const lo = i === span.from[0] ? span.from[1] : 0, hi = i === span.to[0] ? Math.min(span.to[1], all.length - 1) : all.length - 1;
+    const stops = car ? all.slice(lo, hi + 1) : [], pts = car ? allPts.slice(lo, hi + 1) : [];
+    let km = 0, h = 0, est = 0; const line = [];
+    for (let k = 1; k < pts.length; k++) {
+      const r = NET && stops[k - 1] !== stops[k] ? netRoute(stops[k - 1], stops[k]) : null;
+      if (r) { km += r.km; h += r.h; line.push(...r.line); continue; }
+      const [a, b] = leg(pts[k - 1], pts[k]); km += a; h += b; line.push(pts[k - 1], pts[k]); if (a > 0.5) est++;
+    }
+    p.ids.forEach(id => { info.dayOf[id] = i; info.noOf[id] = ++no; if (byId[id].tier === 5) info.must++; });
+    if (p.stay) { (info.stayDays[p.stay] = info.stayDays[p.stay] || []).push(i); info.stays++; }
+    const moved = km > 0.5, vs = p.ids.map(id => byId[id].visit).filter(Boolean);
+    info.days.push({ pts: moved ? pts : [], line: moved ? line : [], est: NET ? est : -1, car, stops: moved ? stops : [], km: Math.round(km), h: Math.round(h * 2) / 2, rawH: h, ids: p.ids.slice(), stay: p.stay || null,
+      vmin: vs.reduce((a, v) => a + v.min, 0), vmax: vs.reduce((a, v) => a + v.max, 0), vmiss: p.ids.length - vs.length });
+    info.km += km; info.h += h; if (h > DATA.max_h) info.over++;
+    pos = allPts[allPts.length - 1]; posId = all[all.length - 1];
+  });
+  info.n = no; info.km = Math.round(info.km); info.h = Math.round(info.h * 2) / 2;
+  return info;
+}
+const hoursText = x => x.rawH < .5 ? "不到半小時" : "約 " + x.h + " 小時";
+// 這天的時數怎麼算的：est 是用直線估算的段數（−1 表示路網還沒載入）
+const howText = x => x.est === 0 ? "沿路估算" : x.est < 0 ? "直線估算" : "部分直線估算";
+// 預計停留時間（分鐘）寫成「45 分鐘」「1.5 小時」；build_spots.py 的 visit_text 同一套寫法
+const durText = m => m < 60 ? m + " 分鐘" : m % 30 === 0 ? m / 60 + " 小時" : Math.floor(m / 60) + " 小時 " + m % 60 + " 分鐘";
+function visitText(v) {
+  const a = v.min, b = v.max;
+  if (a === b) return durText(a);
+  if (b < 60) return a + "–" + b + " 分鐘";
+  if (a >= 60 && a % 30 === 0 && b % 30 === 0) return a / 60 + "–" + b / 60 + " 小時";
+  return durText(a) + "–" + durText(b);
+}
+// 一天的停留合計，取到半小時；有點沒估時註明
+function dayVisitText(x) {
+  if (!x.ids.length) return "";
+  const r = m => Math.round(m / 30) / 2, a = r(x.vmin), b = r(x.vmax);
+  const t = x.vmax ? "停留約 " + (a === b ? a : a + "–" + b) + " 小時" : "";
+  return [t, x.vmiss ? x.vmiss + " 個點沒估停留時間" : ""].filter(Boolean).join("，");
+}
+function dayTitle(i) {
+  const x = PI.days[i], names = x.ids.map(id => short(byId[id]));
+  if (names.length) return names.slice(0, 3).join("、") + (names.length > 3 ? " 等 " + names.length + " 處" : "");
+  if (x.stay) return "住 " + short(byId[x.stay]);
+  return DAYS[i].note ? DAYS[i].note.replace(/（.*?）/g, "") : "還沒排";
+}
+// 在 Google 地圖看這天的開車路線（只連出去）：起點前一晚住處、中途依序是景點、終點今晚住處（取車那天從取車點起、還車那天到還車點為止），跟著行程即時產生。
+// 每個點用 data.py 的 map_query（原文名稱＋地區，Google 才顯示景點名），沒有 gq 的用座標；有 Place ID（gpid，place_ids.py 查的）就一起帶，
+// Google 以 Place ID 為準。中途點要每個都有 Place ID 才帶 waypoint_place_ids（要和 waypoints 一一對應）。只有開車的日子才有
+const GMAP_MAX = 9;  // Google 地圖 App 和電腦最多 9 個中途點，手機瀏覽器 3 個
+function dayRouteHTML(i) {
+  const x = PI.days[i];
+  if (x.stops.length < 2) return "";
+  const q = id => { const s = byId[id]; return encodeURIComponent(s.gq || s.lat + "," + s.lon); };
+  const mid = x.stops.slice(1, -1), extra = mid.length > GMAP_MAX ? mid.length - GMAP_MAX : 0;
+  const a = x.stops[0], b = x.stops[x.stops.length - 1], wp = mid.slice(0, GMAP_MAX), pid = id => byId[id].gpid;
+  const url = "https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=" + q(a) + (pid(a) ? "&origin_place_id=" + pid(a) : "") +
+    "&destination=" + q(b) + (pid(b) ? "&destination_place_id=" + pid(b) : "") +
+    (wp.length ? "&waypoints=" + wp.map(q).join("%7C") + (wp.every(pid) ? "&waypoint_place_ids=" + wp.map(pid).join("%7C") : "") : "");
+  // 中途點的限制只放在滑鼠提示，頁首說明寫一次
+  const hint = extra ? "中途點太多，Google 地圖只帶前 " + GMAP_MAX + " 個" : mid.length > 3 ? mid.length + " 個中途點：手機要用 Google 地圖 App 開，瀏覽器只帶 3 個" : "實際路線和開車時間";
+  return '<a class="gdir" href="' + url + '" title="在 Google 地圖看這天路線（' + hint + '）">Google 地圖 ↗</a>';
+}
+function dayMeta(i) {
+  const x = PI.days[i];
+  const vt = dayVisitText(x);
+  return (x.pts.length ? "開車" + hoursText(x) + "（" + x.km + " km，" + howText(x) + "）" + (x.rawH > DATA.max_h ? ' <span class="warn">⚠️ 超過每天 ' + DATA.max_h + " 小時</span>" : "") : x.car ? "不開車" : "沒租車") +
+    (vt ? '・<span class="nw">' + esc(vt) + "</span>" : "") + "・" + (x.ids.length ? x.ids.length + " 個景點" : "還沒排景點") + (i < LAST ? "・" + (x.stay ? "住 " + esc(short(byId[x.stay])) : "還沒定住宿") : "");
+}
+
+function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+function stars(n, max) { let s = ""; for (let i = 1; i <= max; i++) s += i <= n ? "★" : '<span class="off">★</span>'; return '<span class="stars" aria-hidden="true">' + s + "</span>"; }
+function dots(n, max) { let s = ""; for (let i = 1; i <= max; i++) s += i <= n ? "●" : '<span class="off">●</span>'; return '<span class="stars" aria-hidden="true">' + s + "</span>"; }
+function tierBadge(j) { return j ? '<span class="tier" style="background:' + tierBg(j) + ";color:" + tierInk(j) + '">' + stars(j, 5) + " " + TIER[j] + "</span>" : ""; }
+
+function photoHTML(s) {
+  if (!s.photo) return "";
+  const p = s.photo;
+  return '<figure><img src="' + esc(p.file) + '" alt="' + esc(s.name) + '的照片" loading="lazy" width="900" height="506">' +
+    '<figcaption>圖片：' + esc(p.artist || "不詳") + '，<a href="' + esc(p.license_url || p.page) + '">' + esc(p.license) + '</a>，<a href="' + esc(p.page) + '">Wikimedia Commons</a></figcaption></figure>';
+}
+// 評分：依地圖設定 ratings 列的網站，一個網站一框；地點沒有這個網站的分數時，設定寫了 missing 才顯示那一框
+const norm = t => String(t || "").replace(/[\s（）()・「」]/g, "");
+const ratingsOf = (s, site) => (s.ratings || []).filter(r => r.site === site);
+// 分數：滿分 3 以下的整數畫成圓點，數字依滿分顯示到小數一位，文字（約略值、範圍）照原文
+function scoreHTML(r) {
+  if (r.score == null) return "";
+  if (typeof r.score === "number" && Number.isInteger(r.score) && r.scale <= 3) return '<span class="v">' + dots(r.score, r.scale) + "</span>";
+  return '<span class="v">' + esc(typeof r.score === "number" ? r.score.toFixed(1) : r.score) + "</span> / " + r.scale;
+}
+function ratingHTML(s) {
+  if (s.id === HOME) return "";
+  let out = '<div class="ratings">';
+  if (s.tier) out += '<div class="rbox"><span class="k">' + esc(SEASON) + '推薦度（Claude 評估）</span>' + tierBadge(s.tier) + '<div class="def">' + TIER[s.tier] + "＝" + TIER_DEF[s.tier] + "</div>" + (s.tier_why ? '<div class="why">' + esc(s.tier_why) + "</div>" : "") + "</div>";
+  PAGE.ratings.forEach(site => {
+    const rs = ratingsOf(s, site.site);
+    if (!rs.length && !site.missing) return;
+    out += '<div class="rbox"><span class="k">' + esc(site.name) + (site.about ? "（" + esc(site.about) + "）" : "") + "</span>";
+    if (!rs.length) out += '<span class="why">' + esc(site.missing) + "</span>";
+    const named = rs.filter(r => r.name).length;
+    rs.forEach(r => {
+      const reviews = r.reviews != null ? "（" + esc(typeof r.reviews === "number" ? r.reviews.toLocaleString() : r.reviews) + " 則）" : "";
+      const head = (r.kind && r.score != null ? esc(r.kind) + " " : "") + scoreHTML(r) + reviews + (r.label ? " " + esc(r.label) : "");
+      const why = [r.name && (named > 1 || ![s.name, s.local].some(x => norm(x) === norm(r.name))) ? esc(site.name) + "頁面：" + esc(r.name) : "",
+        r.note ? (r.score == null && r.kind ? esc(r.kind) + "：" : "") + esc(r.note) : ""].filter(Boolean);
+      out += "<div>" + (head ? head : "") + why.map(w => '<div class="why">' + w + "</div>").join("") + "</div>";
+    });
+    out += "</div>";
+  });
+  return out + "</div>";
+}
+// 資料來源：官網放第一個，接著評分網站的頁面、其他來源、停留時間的來源；同一個網址只列一次
+function srcHTML(s) {
+  const items = (s.website ? [{ t: "官網", u: s.website }] : []);
+  const add = x => { if (x.u && !items.some(y => y.u === x.u)) items.push(x); };
+  PAGE.ratings.forEach(site => ratingsOf(s, site.site).forEach(r => add({ t: site.name + (r.name ? "：" + r.name : ""), u: r.url })));
+  s.sources.forEach(add);
+  if (s.visit) s.visit.sources.forEach(add);
+  if (!items.length) return "";
+  return '<p class="src">資料來源：' + items.map(x => '<a href="' + esc(x.u) + '">' + esc(x.t) + "</a>").join("、") + "</p>";
+}
+function factsHTML(s) {
+  const rows = (s.visit ? [["預計停留（Claude 估計）", visitText(s.visit) + "：" + s.visit.note]] : []).concat((s.facts || []).filter(r => r[1]));
+  if (!rows.length) return "";
+  return '<dl class="facts">' + rows.map(r => "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>").join("") + "</dl>";
+}
+function chipsHTML(s, tag, extra) {
+  return '<div class="chips"><span class="chip">' + esc(s.region) + "</span>" + s.cats.map(k => '<span class="chip cat">' + icon(k) + esc(CAT[k][2]) + "</span>").join("") + (tag ? '<span class="chip opt">' + tag + "</span>" : "") + (extra || "") + "</div>";
+}
+// 在地圖 App 打開這個點。Google 地圖：有 Place ID（gpid）就指定那個地點，否則用 gq（原文名稱＋地區）搜尋，Google 才顯示景點名；
+// 沒有 gq 的（泛指一類的店、列車）用座標。Apple 地圖：在座標放圖釘並標名稱。外部連結，不嵌入
+function mapLinksHTML(s) {
+  if (s.lat == null || s.lon == null) return "";
+  const ll = s.lat + "," + s.lon, q = encodeURIComponent(s.local || s.name);
+  const g = "https://www.google.com/maps/search/?api=1&query=" + (s.gq ? encodeURIComponent(s.gq) + (s.gpid ? "&query_place_id=" + s.gpid : "") : ll);
+  const approx = !s.approx ? "" : s.gq ? "（Apple 地圖是大概位置）" : "（大概位置）";
+  return '<p class="maplinks">在地圖 App 看' + approx + '：<a href="' + g + '">Google 地圖</a>' +
+    '<a href="https://maps.apple.com/?ll=' + ll + "&q=" + q + '">Apple 地圖</a></p>';
+}
+function detailHTML(s, bg) {
+  return "<p><b>" + esc(s.summary) + "</b></p>" + (s.detail ? "<p>" + esc(s.detail) + "</p>" : "") +
+    (s.season_note ? '<p class="season-note" style="border-left-color:' + bg + '"><b>' + esc(SEASON) + '：</b>' + esc(s.season_note) + "</p>" : "") + factsHTML(s) + mapLinksHTML(s) + ratingHTML(s) + srcHTML(s);
+}
+function starBtn(id) {
+  const on = starSet.has(id), t = on ? "取消星號" : "加星號（想去）";
+  return '<button type="button" class="star" data-star="' + id + '" aria-pressed="' + on + '" aria-label="' + t + '" title="' + t + '">' + STAR_SVG + "</button>";
+}
+// 一列景點（點開看完整內容）。kind：list＝景點清單、plan＝行程裡的景點、stay＝行程裡的住宿；at＝第幾天
+// 左邊 ⠿ 是拖曳把手；右邊景點清單是 ＋／✓，我的行程是 ⋯
+const GRIP = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="3.5" r="1.35"/><circle cx="10.5" cy="3.5" r="1.35"/><circle cx="5.5" cy="8" r="1.35"/><circle cx="10.5" cy="8" r="1.35"/><circle cx="5.5" cy="12.5" r="1.35"/><circle cx="10.5" cy="12.5" r="1.35"/></svg>';
+const PLUS = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>';
+const DONE = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.4l3.1 3.1 6-6.4"/></svg>';
+function addBtnState(s) {
+  const st = statusOf[s.id];
+  if (s.lodging) return { done: !!st, svg: st ? DONE : PLUS, title: st ? "已設成住宿：改晚、取消、到我的行程看" : "住哪一晚",
+    aria: st ? s.name + " 已設成住宿（" + st.t + "），按這裡改晚、取消或到我的行程看" : s.name + "住哪一晚" };
+  return { done: !!st, svg: st ? DONE : PLUS, title: st ? "已排進行程：移到別天、移除、到我的行程看" : "排進哪一天",
+    aria: st ? s.name + " 已排進行程（" + st.t + "），按這裡移到別天、移除或到我的行程看" : "把" + s.name + "排進哪一天" };
+}
+function addBtnHTML(s) {
+  const b = addBtnState(s);
+  return '<button type="button" class="addbtn' + (b.done ? " done" : "") + '" data-menu="' + s.id + '" aria-label="' + esc(b.aria) + '" title="' + b.title + '">' + b.svg + "</button>";
+}
+// 清單列上的分數：設定 brief 的網站，各取第一個有分數的（文字分數去掉「約」和括號）
+const briefScores = s => PAGE.ratings.filter(x => x.brief).map(site => {
+  const r = ratingsOf(s, site.site).find(x => x.score != null);
+  return r ? site.name + " " + (typeof r.score === "number" ? r.score.toFixed(1) : String(r.score).replace(/^約 ?/, "").replace(/（.*）/, "")) : "";
+});
+const MORE = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>';
+function miniHTML(s, kind, at) {
+  const bg = spotBg(s), stay = kind === "stay", inPlan = kind === "plan" || stay;
+  const head = [s.tier ? TIER[s.tier] : ""].concat(briefScores(s)).filter(Boolean).map(esc).join(" · ");
+  const where = kind === "list" ? '<span class="where">' + esc(statusOf[s.id] ? statusOf[s.id].t : "") + "</span>" : "";
+  const vt = kind === "plan" && s.visit ? '<span class="vt">停留 ' + esc(visitText(s.visit)) + "</span>" : "";
+  const meta = where + vt + head + (s.summary ? '<span class="sum">' + (head ? " · " : "") + esc(s.summary) + "</span>" : "");
+  const g = kind === "plan" ? '<span class="g gno" style="--c:' + bg + ";--tx:" + spotInk(s) + '">' + PI.noOf[s.id] + "</span>"
+    : '<span class="g' + (stay || isLodging(s) || isCar(s) ? " gstay" : "") + '" style="--c:' + bg + '">' + icon(stay ? "base" : s.cats[0]) + "</span>";
+  const menu = inPlan ? '<button type="button" class="morebtn" data-menu="' + s.id + '" data-day="' + at + '" data-zone="' + (stay ? "stay" : "stops") + '" aria-label="移動、移除' + esc(s.name) + '，或到景點清單看" title="移動、移除、到景點清單看">' + MORE + "</button>"
+    : addBtnHTML(s);
+  return '<details class="mini' + (stay ? " stay" : "") + '" id="' + (stay ? "stay-" + at : "card-" + s.id) + '" data-id="' + s.id + '" data-kind="' + kind + '"' + (inPlan ? ' data-day="' + at + '"' : "") + "><summary>" +
+    '<button type="button" class="grip" aria-label="按住拖曳' + esc(s.name) + '" title="按住拖曳">' + GRIP + "</button>" + g +
+    '<span class="mt"><b>' + (stay ? "住：" : "") + esc(s.name) + "</b>" + (s.local && s.local !== s.name ? "<small>" + esc(s.local) + "</small>" : "") + '<span class="ms">' + meta + "</span></span>" +
+    (inPlan ? "" : starBtn(s.id)) + menu + CHEV + '</summary><div class="mbody"></div></details>';
+}
+// 小卡展開時才填內容（照片、說明、評分）：清單很長時捲動才順
+function fillMini(c) {
+  const body = c.querySelector(".mbody"); if (!body || body.childElementCount) return;
+  const s = byId[c.dataset.id], kind = c.dataset.kind, where = statusOf[s.id];
+  const tag = kind === "stay" ? "住宿" : kind === "plan" ? "第 " + (Number(c.dataset.day) + 1) + " 天" : where ? where.t : s.lodging ? "還沒設成住宿" : "還沒排進行程";
+  body.innerHTML = photoHTML(s) + '<div class="body">' + chipsHTML(s, esc(tag), jumpHTML(kind === "list" ? "days" : listOf(s), !!where)) + detailHTML(s, tierBg(s.tier)) + "</div>";
+}
+// 到另一頁看同一個點的按鈕；景點清單裡還沒排的點沒有（行程裡找不到）
+function jumpHTML(to, planned) {
+  if (to === "days" && !planned) return "";
+  return '<button type="button" class="jump" data-jump="' + to + '">在' + VIEW_NAME[to] + "看 →</button>";
+}
+
+// 推薦度篩選：沒評推薦度的租車點一律顯示
+const tierOk = s => isCar(s) || (s.tier || 0) >= minTier;
+const visible = s => tierOk(s) && (!catOn.size || s.cats.some(k => catOn.has(k))) && (!starOnly || starSet.has(s.id));
+
+// 地圖上的點：每個點記下它屬於哪幾天、順序，排版時（layoutMap）依優先順序決定顯示成哪一種
+let marks = [], markOf = {}, layoutQueued = false;
+function addMark(s, kind, label, days, order, pool) {
+  const home = s.id === HOME, j = s.tier;
+  const sz = home ? 24 : kind === "stay" ? 20 : kind === "near" ? 22 : ({5: 30, 4: 28, 3: 26, 2: 24, 1: 22})[j] || 24;
+  const gray = kind === "stay" || isLodging(s) || isCar(s), c = gray ? "var(--stay)" : tierBg(j), tx = gray ? "var(--stay-ink)" : tierInk(j);
+  const inner = home ? "起" : kind === "near" ? icon(s.cats[0]) : kind === "stay" ? icon("base") : '<span class="no">' + esc(label) + "</span>";
+  const html = '<div class="pin ' + kind + (home ? " home" : "") + (pool ? " pool" : "") + (starSet.has(s.id) ? " starred" : "") + '" data-id="' + s.id + '" style="--c:' + c + ";--tx:" + tx + ";--sz:" + sz + 'px">' + inner + '</div><span class="plabel"></span>';
+  const m = L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "mk k-" + kind, html, iconSize: [0, 0], iconAnchor: [0, 0] }), title: s.name, keyboard: true });
+  m.on("click", () => select(s.id, true));
+  const mk = { id: s.id, s, kind, m, sz, no: label, days: new Set(days), order, name: short(s), members: [], pool: !!pool };
+  marks.push(mk); markOf[s.id] = mk; pinIndex[s.id] = m;
+  return m;
+}
+// 滑鼠移到卡片上：圖釘稍微放大、移到最上層（觸控裝置不做）
+function hl(id, on) {
+  const mk = markOf[id]; if (!mk) return;
+  const e = pinEl(id); if (e) e.classList.toggle("hl", on);
+  mk.m.setZIndexOffset(on ? 200000 : mk.z || 0);
+}
+// 選中＝點選的那個點（點清單的列、展開小卡、點地圖上的點），一直保留到點下一個；捲動不換。
+// 圖釘放大、光圈、一定顯示名稱；清單那列淡底色＋左側細色條；地圖只在點跑出中間時平移，不改縮放
+let focusId = null, focusCard = null;
+function pinEl(id) { const m = pinIndex[id]; return m && m.getElement() ? m.getElement().querySelector(".pin") : null; }
+function focusSpot(id, pan, card) {
+  if (focusCard) focusCard.classList.remove("focus");
+  focusCard = id ? card || cardEl(id) : null; if (focusCard) focusCard.classList.add("focus");
+  const mk = id && markOf[id];
+  if (focusId !== id) {
+    if (focusId) { const e = pinEl(focusId); if (e) e.classList.remove("focus"); }
+    focusId = id; scheduleLayout();
+    if (!mk) return;
+    const e = pinEl(id); if (e) e.classList.add("focus");
+    const el = mk.m.getElement();  // 原本擠成小點或被合併的，先恢復成完整的點，等排版再補名稱
+    if (el && (mk.st === "dot" || mk.st === "hide")) { el.classList.remove("st-dot", "st-hide"); el.classList.add("st-full"); mk._key = null; }
+  }
+  if (mk && pan !== false) panToFocus(mk.m.getLatLng());
+}
+// 重畫清單後把選中樣式補回去（優先用原本那一列，連住好幾晚的住宿才不會跳到第一晚）
+function refocusCard() {
+  const old = focusCard && focusCard.id; focusCard = null;
+  if (focusId) focusSpot(focusId, false, (old && document.getElementById(old)) || null);
+}
+// 點跑出地圖中間（四邊各留 22%）才移，直接移到正中間。
+// 不能移出 maxBounds：先算出最遠能移到哪裡再 panTo（panBy 會先移過頭再被拉回）
+function panToFocus(ll) {
+  const size = map.getSize(), w = size.x - 64, h = size.y, q = map.latLngToContainerPoint(ll);  // 64px＝右上按鈕欄
+  if (q.x >= w * .22 && q.x <= w * .78 && q.y >= h * .22 && q.y <= h * .78) return;
+  const cp = map.latLngToContainerPoint(map.getCenter());
+  let target = map.containerPointToLatLng(cp.add(q.subtract(L.point(w / 2, h / 2))));
+  if (map.options.maxBounds) target = map._limitCenter(target, map.getZoom(), map.options.maxBounds);
+  const d = map.latLngToContainerPoint(target).subtract(cp);
+  if (Math.hypot(d.x, d.y) < 4) return;   // 已經貼著地形圖邊緣、移不動了
+  map.panTo(target, { animate: !reduce(), duration: .45 });
+}
+
+// ── 地圖排版（參考 Google 地圖）：點和名稱互相不重疊 ──
+// 1. 依優先順序擺點：選中的 > 這天的景點 > 這天的住宿 > 其他天的景點 > 住宿 > 還沒排的點
+// 2. 先完整顯示，擠到更重要的點才縮：還沒排的變小點、住宿和景點縮小、同一種狀態的景點合成「16·17」；縮小只代表擠
+// 3. 名稱依序試右、左、下、上，放得下才顯示；選中的一定顯示
+// 4. 縣名、地名被擋到就藏
+const textW = { ctx: document.createElement("canvas").getContext("2d"), cache: new Map(),
+  get(text, font) { const k = font + "|" + text; let w = this.cache.get(k); if (w === undefined) { this.ctx.font = font; w = this.ctx.measureText(text).width; this.cache.set(k, w); } return w; } };
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { textW.cache.clear(); scheduleLayout(); });
+function scheduleLayout() { if (layoutQueued) return; layoutQueued = true; requestAnimationFrame(() => { layoutQueued = false; layoutMap(); }); }
+const overlaps = (a, list) => list.some(b => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0);
+// 還沒排的點：縮放低於這個等級一律是小點，選中的例外
+const NEAR_SYM_Z = 9;
+// 放到最大（或差半級）還擠在一起的點：挪到旁邊放得下的地方，用細線連回實際位置
+const SPREAD_DZ = .5;
+const segD = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy, k = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+  return Math.hypot(p.x - a.x - k * dx, p.y - a.y - k * dy); };
+const segX = (a, b, c, d) => { const o = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x); return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; };
+// 挪到哪裡：符號不壓到別的符號和實際位置，細線不穿過別的符號、不交叉；找不到就只顧符號不重疊，再找不到才縮成小點
+function spreadSpot(mk, r, hit, placed, leads, size) {
+  const o = mk.p0;
+  if (o.x < -60 || o.y < -60 || o.x > size.x + 60 || o.y > size.y + 60) return null;  // 畫面外的不用找
+  const hx = o.x - hit.mk.p.x, hy = o.y - hit.mk.p.y, a0 = Math.hypot(hx, hy) < .5 ? -Math.PI / 4 : Math.atan2(hy, hx);
+  const near = marks.filter(m => m !== mk && Math.abs(m.p0.x - o.x) < 200 && Math.abs(m.p0.y - o.y) < 200);
+  const pins = placed.filter(b => Math.abs(b.mk.p.x - o.x) < 200 && Math.abs(b.mk.p.y - o.y) < 200);
+  const todo = near.filter(m => !m.st && Math.hypot(m.p0.x - o.x, m.p0.y - o.y) > m.sz / 2);  // 還沒排版的點：之後可能就畫在實際位置
+  const ok = (q, strict) => {
+    if (pins.some(b => Math.hypot(b.mk.p.x - q.x, b.mk.p.y - q.y) < b.r + r + 3)) return false;
+    if (near.some(m => Math.hypot(m.p0.x - q.x, m.p0.y - q.y) < r + 3)) return false;  // 不蓋住別的點的實際位置
+    if (!strict) return true;
+    // 細線的起點本來就在擋住它的符號底下，那個符號不算
+    if (pins.some(b => Math.hypot(b.mk.p.x - o.x, b.mk.p.y - o.y) > b.r && segD(b.mk.p, o, q) < b.r + 2)) return false;
+    if (todo.some(m => segD(m.p0, o, q) < m.sz / 2 + 2)) return false;
+    if (leads.some(l => segX(o, q, l.o, l.q) || segD(q, l.o, l.q) < r + 2)) return false;
+    return true;
+  };
+  for (const strict of [true, false]) for (let k = 1; k <= 4; k++) {
+    const R = k * (2 * r + 4), n = 8 * k;
+    for (let i = 0; i < n; i++) {
+      // 從「背離擋住它的那個點」的方向開始，左右交替往外找
+      const a = a0 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 2 * Math.PI / n, q = { x: o.x + R * Math.cos(a), y: o.y + R * Math.sin(a) };
+      if (ok(q, strict)) return q;
+    }
+  }
+  return null;
+}
+// 名稱框和細線是否相交（細線很短，沿線每 3px 取一點檢查）
+function boxSeg(bx, a, b) { const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 3));
+  for (let i = 0; i <= n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (x > bx.x0 && x < bx.x1 && y > bx.y0 && y < bx.y1) return true; }
+  return false; }
+function layoutMap() {
+  if (!marks.length) return;
+  const z = map.getZoom(), size = map.getSize(), ad = shownDay(), none = ad === null, font = cssC("--font-body"), spread = z > map.getMaxZoom() - SPREAD_DZ;
+  const crect = map.getContainer().getBoundingClientRect();
+  const ctrls = [...map.getContainer().querySelectorAll(".leaflet-control")].map(el => { const r = el.getBoundingClientRect();
+    return { x0: r.left - crect.left - 4, y0: r.top - crect.top - 4, x1: r.right - crect.left + 4, y1: r.bottom - crect.top + 4 }; });
+  for (const mk of marks) {
+    const a = ad !== null && mk.days.has(ad), t = mk.s.tier || 0;
+    mk.act = a; mk.members = []; mk.multi = "";
+    mk.prio = mk.id === focusId ? 1e6 : mk.kind === "main" ? (a ? 9e4 : none ? 8e4 : 6e4) - mk.order
+      : mk.kind === "stay" ? (a ? 8.5e4 : none ? 7e4 : 5e4) : mk.pool ? 1e4 + t * 1e3 - mk.order : (a ? 4e4 : 2e4) + t * 1e3 - mk.order;
+    mk.p = mk.p0 = map.latLngToContainerPoint(mk.m.getLatLng()); mk.d = null; mk.st = "";
+  }
+  const sorted = marks.slice().sort((a, b) => b.prio - a.prio);
+  const scale = (mk, st) => (st === "small" ? .72 : 1) * (mk.id === focusId ? 1.3 : 1);
+  const placed = [], leads = [];
+  for (const mk of sorted) {
+    const foc = mk.id === focusId;
+    let st = "full";
+    if (!foc && mk.kind === "near" && z < NEAR_SYM_Z) st = "dot";
+    else if (!foc) {
+      // 還沒排的點要留 2px 才算放得下；景點和住宿重疊超過 3px 才算擠
+      const r = mk.sz / 2 * scale(mk, "full"), gap = mk.kind === "near" ? 2 : -3;
+      const hit = placed.find(b => Math.hypot(b.mk.p.x - mk.p.x, b.mk.p.y - mk.p.y) < b.r + r + gap);
+      if (hit) {
+        // 只合併同一種狀態的景點（都是這天或都不是）；選中的點不吞掉別人
+        if (mk.kind === "main" && hit.mk.kind === "main" && hit.mk.id !== focusId && hit.mk.act === mk.act) { st = "hide"; hit.mk.members.push(mk); }
+        else if (mk.kind !== "near") st = "small";
+        else {
+          const q = spread && spreadSpot(mk, r, hit, placed, leads, size);
+          if (q) { mk.p = q; mk.d = { x: q.x - mk.p0.x, y: q.y - mk.p0.y }; leads.push({ o: mk.p0, q }); } else st = "dot";
+        }
+      }
+    }
+    mk.st = st;
+    if (st === "full" || st === "small") placed.push({ mk, r: mk.sz / 2 * scale(mk, st) });
+  }
+  const boxes = [];
+  for (const b of placed) {
+    const mk = b.mk, k = b.r / (mk.sz / 2);
+    if (mk.members.length) mk.multi = [mk, ...mk.members].map(x => x.no).sort((x, y) => Number(x) - Number(y)).join("·");
+    mk.rx = mk.multi ? Math.max(mk.sz, textW.get(mk.multi, "700 12px " + cssC("--font-display")) + 16) / 2 * k : b.r; mk.ry = b.r;
+    boxes.push({ mk, x0: mk.p.x - mk.rx, x1: mk.p.x + mk.rx, y0: mk.p.y - mk.ry, y1: mk.p.y + mk.ry });
+  }
+  const labels = [], inside = bx => bx.x0 >= 4 && bx.y0 >= 4 && bx.x1 <= size.x - 4 && bx.y1 <= size.y - 4;
+  for (const mk of sorted) {
+    mk.lb = ""; mk.ltext = "";
+    const foc = mk.id === focusId;
+    if (mk.st === "hide" || mk.st === "dot") continue;
+    // 名稱：選中的、這天的景點一定試；其他天的放大到一定程度或是「必去」才試
+    const want = foc || (mk.kind === "main" ? mk.act || none || z >= 9 || mk.s.tier === 5 : mk.kind === "stay" ? (mk.act ? z >= 7.5 : z >= 9.5) : (mk.act ? z >= 9.25 : z >= 10.5));
+    if (!want) continue;
+    const text = mk.name + (mk.members.length ? " 等 " + (mk.members.length + 1) + " 處" : "");
+    const fs = foc ? 13 : mk.kind === "near" ? 11 : 12, fw = foc ? 700 : mk.kind === "near" ? 500 : 600;
+    const w = textW.get(text, fw + " " + fs + "px " + font) + 3, h = Math.ceil(fs * 1.25), p = mk.p, rx = mk.rx, ry = mk.ry;
+    const cand = { r: { x0: p.x + rx + 4, x1: p.x + rx + 4 + w, y0: p.y - h / 2, y1: p.y + h / 2 }, l: { x0: p.x - rx - 4 - w, x1: p.x - rx - 4, y0: p.y - h / 2, y1: p.y + h / 2 },
+                   b: { x0: p.x - w / 2, x1: p.x + w / 2, y0: p.y + ry + 2, y1: p.y + ry + 2 + h }, t: { x0: p.x - w / 2, x1: p.x + w / 2, y0: p.y - ry - 2 - h, y1: p.y - ry - 2 } };
+    const hitsPin = bx => boxes.some(b => b.mk !== mk && bx.x0 < b.x1 && bx.x1 > b.x0 && bx.y0 < b.y1 && bx.y1 > b.y0) || leads.some(l => boxSeg(bx, l.o, l.q));
+    let side = ["r", "l", "b", "t"].find(k => inside(cand[k]) && !overlaps(cand[k], ctrls) && !hitsPin(cand[k]) && !overlaps(cand[k], labels));
+    if (!side && foc) side = ["r", "l", "b", "t"].find(k => inside(cand[k]) && !overlaps(cand[k], ctrls)) || "r";
+    if (side) { mk.lb = side; mk.ltext = text; labels.push(cand[side]); }
+  }
+  // 縣名、地名：被景點或景點名稱擋到就先藏起來；彼此也不重疊，重要的先放（重點縣名 > 縣廳所在地 > 其他縣名 > 大城市 > 市 > 町）。
+  // 地名四周多留 6px，不要一個挨一個；景點優先（參考 Google 地圖）：壓到小圓點就試著往上、往下挪一點，挪不開就不寫；超出地圖邊緣的不放
+  const span = viewSpan();
+  syncPlaces(span);
+  const taken = boxes.concat(labels), display = cssC("--font-display"), items = [];
+  const dots = marks.filter(mk => mk.st === "dot").map(mk => ({ x0: mk.p.x - 4, x1: mk.p.x + 4, y0: mk.p.y - 4, y1: mk.p.y + 4 }));
+  const prefOn = span > PREF_SPAN[0] && span <= PREF_SPAN[1];
+  for (const c of cityMarks) items.push({ m: c.m, text: c.text, pref: true, ord: c.focus ? 0 : 2, p: 0, show: prefOn });
+  for (const [pl, m] of placeMk) { const lv = placeLv(pl); items.push({ m, text: pl.n, t: pl.t, ord: lv === 1 ? 1 : lv + 1, p: pl.p, show: true }); }
+  items.sort((a, b) => a.ord - b.ord || b.p - a.p);
+  for (const c of items) {
+    const el = c.m.getElement(); if (!el) continue;
+    let clash = !c.show, oy = 0;  // 不在這個範圍的縣名也用 clash 藏起來
+    if (c.show) {
+      const n = [...c.text].length, fs = c.pref || c.t <= 2 ? 12 : 11, pad = c.pref ? 0 : 6;
+      const w = c.pref ? textW.get(c.text, "600 12px " + display) + n * fs * .35 : textW.get(c.text, (c.t === 1 ? 500 : 400) + " " + fs + "px " + font) + (c.t === 1 ? n * fs * .12 : 0) + 4;
+      const q = map.latLngToContainerPoint(c.m.getLatLng()), h = fs * 1.3;
+      const box = dy => ({ x0: q.x - w / 2 - pad, x1: q.x + w / 2 + pad, y0: q.y + dy - h / 2 - pad / 2, y1: q.y + dy + h / 2 + pad / 2 });
+      const fits = bx => !overlaps(bx, taken) && (c.pref || (inside(bx) && !overlaps(bx, ctrls) && !overlaps(bx, dots)));
+      const dy = (c.pref ? [0] : [0, -(h * .5 + 5), h * .5 + 5]).find(d => fits(box(d)));
+      clash = dy === undefined;
+      if (!clash) { taken.push(box(dy)); oy = dy; }
+    }
+    if (el.classList.contains("clash") !== clash) el.classList.toggle("clash", clash);
+    if (!c.pref && el._oy !== oy) { el._oy = oy; el.style.setProperty("--oy", oy + "px"); }
+  }
+  for (const mk of marks) {
+    const el = mk.m.getElement(); if (!el) continue;
+    const key = mk.st + "|" + mk.lb + "|" + (mk.id === focusId) + "|" + (mk.rx || 0).toFixed(1) + "|" + (mk.ry || 0).toFixed(1) + "|" + (mk.d ? mk.d.x.toFixed(1) + "," + mk.d.y.toFixed(1) : "");
+    if (mk._key !== key || mk._el !== el) {
+      mk._key = key; mk._el = el;
+      for (const c of [...el.classList]) if (/^(st|lb)-/.test(c)) el.classList.remove(c);
+      el.classList.add("st-" + mk.st); if (mk.lb) el.classList.add("lb-" + mk.lb);
+      el.classList.toggle("is-focus", mk.id === focusId);
+      el.style.setProperty("--rx", (mk.rx || 0).toFixed(1) + "px"); el.style.setProperty("--ry", (mk.ry || 0).toFixed(1) + "px");
+      el.classList.toggle("spread", !!mk.d);
+      if (mk.d) { el.style.setProperty("--dx", mk.d.x.toFixed(1) + "px"); el.style.setProperty("--dy", mk.d.y.toFixed(1) + "px"); }
+      leadOf(mk);
+    }
+    const lab = el.querySelector(".plabel"); if (lab.textContent !== mk.ltext) lab.textContent = mk.ltext;
+    if (mk.kind === "main") { const pinD = el.querySelector(".pin"), no = pinD.querySelector(".no"), t = mk.multi || mk.no;
+      if (no && no.textContent !== t) no.textContent = t; pinD.classList.toggle("multi", !!mk.multi); }
+    const zi = Math.round(mk.prio / 10); if (mk.z !== zi) { mk.z = zi; mk.m.setZIndexOffset(zi); }
+  }
+}
+map.on("zoomend moveend resize", scheduleLayout);
+// 挪開的點連回實際位置的細線：放在 leads 層（所有圖釘下面），用一個不能點的 marker 跟著實際位置縮放移動
+function leadOf(mk) {
+  if (!mk.d) { if (mk.lm && map.hasLayer(mk.lm)) mk.lm.remove(); return; }
+  if (!mk.lm) mk.lm = L.marker(mk.m.getLatLng(), { pane: "leads", interactive: false, keyboard: false,
+    icon: L.divIcon({ className: "lead-mk", html: '<span class="lead"></span>', iconSize: [0, 0], iconAnchor: [0, 0] }) });
+  if (!map.hasLayer(mk.lm)) mk.lm.addTo(map);
+  const e = mk.lm.getElement();
+  e.style.setProperty("--dl", Math.hypot(mk.d.x, mk.d.y).toFixed(1) + "px"); e.style.setProperty("--da", Math.atan2(mk.d.y, mk.d.x).toFixed(3) + "rad");
+}
+const cardEl = id => id ? document.querySelector('#list [data-id="' + id + '"]') : null;
+function select(id, fromMap, card) {
+  // 景點清單：地圖上點的點在收合的縣裡，先展開那一縣
+  if (fromMap && view !== "days" && byId[id] && folded.has(grpKey(byId[id]))) setFold([grpKey(byId[id])], false);
+  card = card || cardEl(id);
+  // 我的行程：在地圖上點還沒排的點，直接問要排進哪一天；兩個清單裡沒有的點（另一個清單的、被篩掉的）也一樣
+  if (!card && fromMap) { focusSpot(id, false); openSheet(id, null); return; }
+  if (card) {
+    const sec = view === "days" && card.closest(".day"); if (sec) activateDay(Number(sec.dataset.day));
+    if (fromMap) {
+      if (card.tagName === "DETAILS") { fillMini(card); card.open = true; }
+      card.scrollIntoView({ behavior: reduce() ? "auto" : "smooth", block: "start" }); card.focus({ preventScroll: true });
+    }
+  }
+  focusSpot(id, !fromMap, card);
+}
+
+function dayPts(i) { const x = PI.days[i]; return x.pts.length ? x.pts : x.ids.map(ll).concat(x.stay ? [ll(x.stay)] : []); }
+function dayBounds(i) { const pts = i === null ? [] : dayPts(i); return pts.length ? L.latLngBounds(pts) : null; }
+// 全程：行程排了的點；還沒排就看全部景點
+function fitAll() {
+  const pts = PI.days.flatMap((x, i) => dayPts(i));
+  const b = L.latLngBounds(pts.length >= 2 ? pts : DATA.spots.map(s => [s.lat, s.lon]));
+  map.fitBounds(b, { paddingTopLeft: [24, 24], paddingBottomRight: [68, 24], maxZoom: 10 });
+}
+function styleDays() {
+  // 用 CSS class 切換才有過渡（改 SVG 屬性沒有）；先移到最上層、讓瀏覽器算一次樣式再換 class
+  const ad = shownDay(), top = dayLayers[ad];
+  if (top) top.forEach(l => { l.bringToFront(); const el = l.getElement(); if (el) getComputedStyle(el).strokeWidth; });
+  dayLayers.forEach((pair, i) => {
+    if (!pair) return;
+    const on = ad === i, dim = ad !== null && !on;
+    pair.forEach(l => { const el = l.getElement(); if (el) { el.classList.toggle("on", on); el.classList.toggle("dim", dim); } });
+  });
+  dayHeads();
+}
+function dayHeads() { const ad = shownDay(); document.querySelectorAll("#list .day").forEach(s => s.classList.toggle("active", Number(s.dataset.day) === ad)); }
+const shownDay = () => view === "days" ? activeDay : null;  // 另外兩個分頁不強調哪一天
+// 地圖右上的「這天」：我的行程排了東西才能按
+function ctlState() { const b = document.querySelector('.mapctl [data-act="day"]'); if (b) b.disabled = view !== "days" || !PI.days.some((x, i) => dayBounds(i)); }
+// 放大目前這天；還沒點過哪天，就用正在看的那天（閱讀線所在的那天，在清單開頭時是第一天）
+function zoomHere() {
+  let i = activeDay;
+  if (i === null) { i = 0; const line = readingLine(); for (const el of scrollItems) { if (el.getBoundingClientRect().top > line) break; const s = el.closest(".day"); if (s) i = Number(s.dataset.day); } }
+  if (!dayBounds(i)) { toast("第 " + (i + 1) + " 天還沒排東西"); return; }
+  activateDay(i); zoomDay(i);
+}
+// 「全程」：取消目前這天，所有天的路線一樣顯示
+function showAll() { if (activeDay === null) return; activeDay = null; styleDays(); ctlState(); scheduleLayout(); }
+function activateDay(i) {
+  if (activeDay === i) return;
+  activeDay = i; styleDays(); ctlState(); scheduleLayout();
+}
+// 只有按「這天」「全程」才縮放（留出右上按鈕欄的位置）
+function zoomDay(i) { const b = dayBounds(i); if (!b) return; map.flyToBounds(b, { paddingTopLeft: [40, 40], paddingBottomRight: [76, 40], maxZoom: 10, duration: reduce() ? 0 : .6, animate: !reduce() }); }
+function panDay(i) { const b = dayBounds(i); if (b) map.panTo(b.getCenter(), { animate: !reduce() }); }
+
+function summaryUI() {
+  const stat = (b, t, warn) => '<div class="stat"><b' + (warn ? ' style="color:var(--warn)"' : "") + ">" + b + "</b><span>" + t + "</span></div>";
+  document.getElementById("summary").innerHTML =
+    stat(PI.n + " 個", "排進行程的景點（必去 " + PI.must + " 個）") +
+    stat(PI.stays + " / " + LAST + " 晚", "住宿已定") +
+    stat("約 " + PI.h + " 小時", "開車合計（約 " + PI.km.toLocaleString() + " km，粗估）") +
+    stat(PI.over + " 天", "開車超過每天 " + DATA.max_h + " 小時", PI.over > 0);
+}
+// 地圖：每天一段線（前一晚住的地方 → 景點 → 今晚住，路網載入後沿路畫，之前和接不上路網的段落是直線）、排進行程的景點（編號）、住宿、還沒排的點（類別符號；我的行程不畫）
+function renderMap() {
+  dayLayers.flat().forEach(l => l && l.remove()); if (pinLayer) pinLayer.remove(); marks.forEach(mk => mk.lm && mk.lm.remove());
+  const keep = focusId; pinIndex = {}; marks = []; markOf = {}; focusId = null;
+  dayLayers = PI.days.map((x, i) => x.pts.length < 2 ? null : [
+    L.polyline(x.line, { color: css("--surface"), weight: 6, opacity: .85, lineCap: "round", lineJoin: "round", interactive: false, className: "dayline casing" }).addTo(map),
+    L.polyline(x.line, { color: css("--accent"), weight: 3, opacity: .95, lineCap: "round", lineJoin: "round", className: "dayline line" }).on("click", () => activateDay(i)).addTo(map)]);
+  const pins = [];
+  PI.days.forEach((x, i) => x.ids.forEach(id => pins.push(addMark(byId[id], "main", String(PI.noOf[id]), [i], PI.noOf[id]))));
+  // 住宿：住的那晚和隔天早上出發都算那兩天的點
+  Object.entries(PI.stayDays).forEach(([id, ds]) => { if (PI.dayOf[id] === undefined) pins.push(addMark(byId[id], "stay", "", ds.concat(ds.map(i => i + 1)), 0)); });
+  if (!PI.stayDays[HOME]) pins.push(addMark(byId[HOME], "stay", "", [0], 0));
+  DATA.spots.forEach((s, k) => { if (s.id !== HOME && PI.dayOf[s.id] === undefined && !PI.stayDays[s.id] && view !== "days" && (view === "hotels" ? isLodging(s) : !isLodging(s) && visible(s))) pins.push(addMark(s, "near", "", [], k)); });
+  pinLayer = L.layerGroup(pins).addTo(map);
+  styleDays(); ctlState(); zoomCls(); scheduleLayout();
+  if (keep) focusSpot(keep, false, focusCard);
+}
+function computeStatus() {
+  const st = {};
+  PI.days.forEach((x, i) => x.ids.forEach(id => { st[id] = { t: "第 " + (i + 1) + " 天・" + shortDate(DAYS[i].date) }; }));
+  Object.entries(PI.stayDays).forEach(([id, ds]) => { if (!st[id]) st[id] = { t: "住・" + DAYS[ds[0]].md + (ds.length > 1 ? " 起 " + ds.length + " 晚" : "") }; });
+  return st;
+}
+function render() {
+  PI = planInfo(); statusOf = computeStatus();
+  VIEWS.forEach(v => document.getElementById("view-" + v).setAttribute("aria-selected", String(view === v)));
+  // 住宿清單不套用景點的篩選：篩選列只留一行說明（列的高度不變，地圖不跳）
+  // 篩選景點只在景點清單（住宿清單不套用景點的篩選、我的行程只看行程）
+  fbar.hidden = view !== "list";
+  summaryUI(); renderMap(); legend();
+  if (view === "list") renderList(); else if (view === "hotels") renderHotels(); else renderPlan();
+  refocusCard(); dayHeads();
+}
+// 我的行程：每天一段（景點照順序、今晚住），可以拖曳調整
+function renderPlan() {
+  const list = document.getElementById("list"), sights = DATA.spots.filter(s => s.id !== HOME && !isLodging(s)), allN = sights.length;
+  let html = '<header class="day-head lv-head" id="planhead"><div class="dn">我的行程</div><h2 class="day-title">' + esc(DAYS[0].date) + "–" + esc(DAYS[LAST].date) + "・" + DAYS.length + " 天</h2>" +
+    '<div class="day-meta">已排 ' + PI.n + " 個景點（必去 " + PI.must + "）・住宿已定 " + PI.stays + " / " + LAST + " 晚・開車合計約 " + PI.h + " 小時（粗估）" + (PI.over ? '・<span class="warn">⚠️ ' + PI.over + " 天超過 " + DATA.max_h + " 小時</span>" : "") + "</div>" +
+    '<p class="day-note">到「景點清單」按住每列左邊的 ⠿ 拖到下面的日期，或按 ＋ 選日期；住宿到「住宿清單」選。這裡按住 ⠿ 可以調整順序、移到別天，拖到「今晚住哪」就是住宿；按 ⋯ 可以上下移、移除，或跳到它在景點清單的位置。</p>' +
+    '<div class="lv-actions"><button type="button" class="chipbtn" data-act="copy-plan">複製行程文字</button><span class="lv-sync" id="plansync">' + esc(planSyncText) + "</span></div>" +
+    '<textarea class="lv-copy" id="plancopy" readonly hidden aria-label="行程文字"></textarea></header>';
+  DAYS.forEach((d, i) => {
+    const x = PI.days[i], dn = "第 " + (i + 1) + " 天", title = dayTitle(i);
+    html += '<section class="day" id="day-' + i + '" data-day="' + i + '">' +
+      '<div class="day-bar" aria-hidden="true" title="回到這天開頭"><span class="pn">' + dn + '</span><span class="pt">' + esc(title) + '</span><span class="pd">' + esc(shortDate(d.date)) + "</span>" + PIN_UP + "</div>" +
+      '<header class="day-head" id="dayhead-' + i + '" tabindex="0" role="button" aria-label="在地圖上看第 ' + (i + 1) + ' 天">' +
+      '<div class="dn">' + dn + '<span class="dd">' + esc(d.date) + "</span>" + dayRouteHTML(i) + "</div>" +
+      '<h2 class="day-title">' + esc(title) + "</h2>" +
+      '<div class="day-meta">' + dayMeta(i) + "</div>" + (d.note ? '<p class="day-note">' + esc(d.note) + "</p>" : "") + "</header>" +
+      '<div class="pzone" data-day="' + i + '">' + (x.ids.length ? x.ids.map(id => miniHTML(byId[id], "plan", i)).join("")
+        : '<div class="pempty" id="pempty-' + i + '">把景點拖到這裡，或在「景點清單」按 ＋</div>') + "</div>" +
+      (i < LAST ? '<div class="pstay" data-day="' + i + '">' + (x.stay ? miniHTML(byId[x.stay], "stay", i)
+        : '<div class="pstay-empty" id="pstayempty-' + i + '">' + icon("base") + "今晚住哪：到「住宿清單」選，或把景點拖到這裡</div>") + "</div>" : "") +
+      "</section>";
+  });
+  list.innerHTML = html;
+  catsUI(); shownUI(sights.filter(visible).length, allN);
+  bindRows(list);
+  list.querySelectorAll(".day-head[id^=dayhead-]").forEach(h => {
+    const go = () => { const i = Number(h.parentNode.dataset.day); activateDay(i); panDay(i); };
+    h.addEventListener("click", e => { if (!e.target.closest(".gdir")) go(); });
+    h.addEventListener("keydown", e => { if (e.target === h && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); go(); } });
+  });
+  list.querySelectorAll(".day-bar").forEach(b => b.addEventListener("click", () => {
+    const i = Number(b.parentNode.dataset.day); activateDay(i); panDay(i);
+    document.getElementById("dayhead-" + i).scrollIntoView({ behavior: reduce() ? "auto" : "smooth", block: "start" });
+  }));
+  list.querySelector('[data-act="copy-plan"]').addEventListener("click", e => copyText(e.currentTarget, planText(), document.getElementById("plancopy"), "複製行程文字"));
+  scrollItems = [...list.querySelectorAll("#planhead, .day-head, .pempty, .mini, .pstay-empty")];
+  dayPins();
+}
+// 滑鼠移到列上時地圖的點放大：只在有滑鼠的裝置掛、passive（iPad 上有 pointer 監聽的地方捲動要先等網頁）
+const HOVER = matchMedia("(hover: hover) and (pointer: fine)").matches;
+function bindRows(list) {
+  list.querySelectorAll(".mini").forEach(c => {
+    c.addEventListener("toggle", () => { if (c.dataset.quiet) { delete c.dataset.quiet; return; } if (c.open) { fillMini(c); select(c.dataset.id, false, c); } });
+    if (HOVER) {
+      c.addEventListener("pointerenter", () => hl(c.dataset.id, true), { passive: true });
+      c.addEventListener("pointerleave", () => hl(c.dataset.id, false), { passive: true });
+    }
+  });
+  list.querySelectorAll(".grip").forEach(g => g.addEventListener("pointerdown", gripDown, { passive: true }));
+}
+// 景點清單：依地區分組（地圖設定 region_order 的順序），組內依推薦度、第一個評分網站的評論數
+const PREF_ORDER = PAGE.region_order;
+let statusOf = {};
+const reviewsOf = s => Math.max(0, ...(PAGE.ratings.length ? ratingsOf(s, PAGE.ratings[0].site) : []).map(r => typeof r.reviews === "number" ? r.reviews : 0));
+const pf1 = s => s.region.split("・")[0];  // 跨區的點（「A・B」）歸到第一個
+// 縣的分組（收合狀態、星號數、已排幾個）：住宿清單和景點清單分開記
+const grpKey = s => (isLodging(s) ? "宿:" : "") + pf1(s);
+function renderList() {
+  const list = document.getElementById("list");
+  const all = DATA.spots.filter(s => s.id !== HOME && !isLodging(s)), vis = all.filter(visible);
+  const prefs = PREF_ORDER.concat([...new Set(all.map(pf1))].filter(x => !PREF_ORDER.includes(x)));
+  let html = '<section class="lv" id="lv"><header class="day-head lv-head" id="lvhead">' +
+    '<div class="dn">景點清單</div><h2 class="day-title">全部 ' + all.length + " 個景點</h2>" +
+    '<div class="day-meta">顯示 ' + vis.length + " 個・已排進行程 " + PI.n + " 個・已加星號 <b data-starcount>" + starSet.size + "</b> 個</div>" +
+    '<p class="day-note">按住每列左邊的 ⠿，拖到下面的日期就排進那天；或按 ＋ 選日期。住宿在「住宿清單」。排好的 ＋ 會變成藍色 ✓，按它可以移到別天、移除，或跳到它在我的行程的位置。☆ 星號只是「想去」的記號，可以用上面的「已加星號」篩出來。</p>' +
+    '<div class="lv-actions"><button type="button" class="chipbtn" data-act="fold-all"></button><button type="button" class="chipbtn" data-act="copy-stars">複製星號清單</button><span class="lv-sync" id="starsync">' + esc(syncText) + "</span></div>" +
+    '<textarea class="lv-copy" id="starcopy" readonly hidden aria-label="星號清單"></textarea></header>';
+  prefs.forEach((pf, gi) => {
+    const ids = vis.filter(s => pf1(s) === pf).sort((a, b) => (b.tier || 0) - (a.tier || 0) || reviewsOf(b) - reviewsOf(a)).map(s => s.id);
+    if (!ids.length) return;
+    const f = folded.has(pf);
+    html += '<button type="button" class="near-head grp-h" id="grp-' + gi + '" data-grp="' + esc(pf) + '" aria-expanded="' + !f + '" aria-controls="grpb-' + gi + '">' + CHEV +
+      '<span class="gn">' + esc(pf) + "</span>" + ids.length + ' 個<span class="gs" data-grpstar="' + esc(pf) + '"></span><span class="gp" data-grpplan="' + esc(pf) + '"></span></button>' +
+      '<div class="grp-b" id="grpb-' + gi + '"' + (f ? " hidden" : "") + ">" + ids.map(id => miniHTML(byId[id], "list")).join("") + "</div>";
+  });
+  if (!vis.length) html += '<div class="near-empty">沒有符合篩選的景點</div>';
+  list.innerHTML = html + "</section>" + trayHTML();
+  catsUI(); shownUI(vis.length, all.length); paintStars(); trayUI(); grpPlanUI(); foldAllUI();
+  bindRows(list);
+  list.querySelector('[data-act="fold-all"]').addEventListener("click", () => { const hs = [...list.querySelectorAll(".grp-h")]; setFold(hs.map(h => h.dataset.grp), hs.some(h => h.getAttribute("aria-expanded") === "true")); });
+  list.querySelector('[data-act="copy-stars"]').addEventListener("click", e => copyText(e.currentTarget, starText(), document.getElementById("starcopy"), "複製星號清單"));
+  list.querySelectorAll(".tchip").forEach(c => c.addEventListener("click", () => gotoDay(Number(c.dataset.day))));
+  listItems(); dayPins();
+}
+// 住宿清單：依地區分組，旅館在前（依第一個評分網站的評論數）、住宿地區在後；不套用景點的篩選
+function stayMeta() {
+  const n = Object.keys(PI.stayDays).filter(id => byId[id] && byId[id].lodging).reduce((a, id) => a + PI.stayDays[id].length, 0);
+  return "已定住宿 " + PI.stays + " / " + LAST + " 晚（其中具體旅館 " + n + " 晚）";
+}
+function renderHotels() {
+  const list = document.getElementById("list");
+  const all = DATA.spots.filter(s => s.id !== HOME && isLodging(s)), nH = all.filter(s => s.lodging).length;
+  const prefs = PREF_ORDER.concat([...new Set(all.map(pf1))].filter(x => !PREF_ORDER.includes(x)));
+  let html = '<section class="lv" id="lv"><header class="day-head lv-head" id="lvhead">' +
+    '<div class="dn">住宿清單</div><h2 class="day-title">旅館 ' + nH + " 家・住宿地區 " + (all.length - nH) + " 個</h2>" +
+    '<div class="day-meta" data-staymeta>' + esc(stayMeta()) + "</div>" +
+    '<p class="day-note">' + esc(PAGE.texts.lodging_note) + '按住每列左邊的 ⠿ 拖到下面的日期，或按 ＋ 選「住這晚」，就設成那晚的住宿（可以連住）。「住宿地區」是還沒選旅館時先佔位用的城市或溫泉鄉，也可以排進行程當景點。</p>' +
+    '<div class="lv-actions"><button type="button" class="chipbtn" data-act="fold-all"></button></div></header>';
+  prefs.forEach((pf, gi) => {
+    const g = all.filter(s => pf1(s) === pf); if (!g.length) return;
+    const key = "宿:" + pf, f = folded.has(key);
+    const hs = g.filter(s => s.lodging).sort((a, b) => reviewsOf(b) - reviewsOf(a)), as = g.filter(s => !s.lodging);
+    const cnt = [hs.length ? "旅館 " + hs.length + " 家" : "", as.length ? "地區 " + as.length + " 個" : ""].filter(Boolean).join("・");
+    html += '<button type="button" class="near-head grp-h" id="grp-' + gi + '" data-grp="' + esc(key) + '" aria-expanded="' + !f + '" aria-controls="grpb-' + gi + '">' + CHEV +
+      '<span class="gn">' + esc(pf) + "</span>" + cnt + '<span class="gs" data-grpstar="' + esc(key) + '"></span><span class="gp" data-grpplan="' + esc(key) + '"></span></button>' +
+      '<div class="grp-b" id="grpb-' + gi + '"' + (f ? " hidden" : "") + ">" + hs.concat(as).map(s => miniHTML(s, "list")).join("") + "</div>";
+  });
+  list.innerHTML = html + "</section>" + trayHTML();
+  paintStars(); trayUI(); grpPlanUI(); foldAllUI();
+  bindRows(list);
+  list.querySelector('[data-act="fold-all"]').addEventListener("click", () => { const hs = [...list.querySelectorAll(".grp-h")]; setFold(hs.map(h => h.dataset.grp), hs.some(h => h.getAttribute("aria-expanded") === "true")); });
+  list.querySelectorAll(".tchip").forEach(c => c.addEventListener("click", () => gotoDay(Number(c.dataset.day))));
+  listItems(); dayPins();
+}
+// 收合的縣裡的列不算進「捲到哪一張」
+function listItems() { scrollItems = [...document.querySelectorAll("#list .lv-head, #list .near-head, #list .near-empty, #list .grp-b:not([hidden]) .mini")]; }
+function setFold(pfs, on) {
+  pfs.forEach(pf => { if (on) folded.add(pf); else folded.delete(pf); });
+  try { localStorage.setItem(SK + "folded", JSON.stringify([...folded])); } catch (e) {}
+  document.querySelectorAll("#list .grp-h").forEach(h => {
+    const f = folded.has(h.dataset.grp); if (h.getAttribute("aria-expanded") === String(!f)) return;
+    h.setAttribute("aria-expanded", String(!f)); document.getElementById(h.getAttribute("aria-controls")).hidden = f;
+  });
+  foldAllUI(); listItems(); dayPins();
+}
+function foldAllUI() {
+  const b = document.querySelector('#list [data-act="fold-all"]'); if (!b) return;
+  const hs = [...document.querySelectorAll("#list .grp-h")], open = hs.some(h => h.getAttribute("aria-expanded") === "true");
+  b.hidden = !hs.length; b.textContent = open ? "全部" + RW + "收合" : "全部" + RW + "展開";
+}
+function grpPlanUI() {
+  const n = {}; Object.keys(statusOf).forEach(id => { if (byId[id] && id !== HOME) { const k = grpKey(byId[id]); n[k] = (n[k] || 0) + 1; } });
+  document.querySelectorAll("[data-grpplan]").forEach(el => { const t = n[el.dataset.grpplan] ? "已排 " + n[el.dataset.grpplan] : ""; if (el.textContent !== t) el.textContent = t; });
+}
+function trayHTML() {
+  return '<div class="tray" id="tray" role="group" aria-label="拖到這一天"><span class="tray-label">拖到<br>這天</span>' + DAYS.map((d, i) =>
+    '<button type="button" class="tchip" data-day="' + i + '" title="第 ' + (i + 1) + " 天 " + esc(d.date) + '（點一下看這天）"><b>' + d.md + "</b><span>" + d.wd + '</span><span class="n"></span></button>').join("") + "</div>";
+}
+function trayUI() {
+  document.querySelectorAll(".tchip").forEach(c => {
+    const x = PI.days[Number(c.dataset.day)], n = x.ids.length;
+    c.querySelector(".n").textContent = n ? n + " 個" : x.stay ? "住" : "—";
+    c.classList.toggle("has", n > 0 || !!x.stay); c.classList.toggle("warn", x.rawH > DATA.max_h);
+  });
+}
+// 景點清單裡改了行程：不重畫整個清單（會跳、展開的會收起來），只更新每列的狀態和日期列
+function refreshListStatus() {
+  document.querySelectorAll('#list .mini[data-kind="list"]').forEach(c => {
+    const w = c.querySelector(".where"), t = statusOf[c.dataset.id] ? statusOf[c.dataset.id].t : "";
+    if (!w || w.textContent === t) return;
+    w.textContent = t;
+    // 按鈕原地更新（不換掉元素：選單關掉後焦點要能回到這顆按鈕）
+    const b = c.querySelector(".addbtn"), x = addBtnState(byId[c.dataset.id]);
+    if (b) { if (b.classList.contains("done") !== x.done) { b.classList.toggle("done", x.done); b.innerHTML = x.svg; } b.setAttribute("aria-label", x.aria); b.title = x.title; }
+    const ch = c.querySelector(".mbody .chips");
+    if (ch) { const o = ch.querySelector(".chip.opt"); if (o) o.textContent = t || (byId[c.dataset.id].lodging ? "還沒設成住宿" : "還沒排進行程"); const j = ch.querySelector(".jump"); if (j) j.remove(); ch.insertAdjacentHTML("beforeend", jumpHTML("days", !!t)); }
+  });
+  const m = document.querySelector("#lvhead .day-meta");
+  if (m) m.innerHTML = m.innerHTML.replace(/已排進行程 \d+ 個/, "已排進行程 " + PI.n + " 個");
+  const sm = document.querySelector("[data-staymeta]"); if (sm) sm.textContent = stayMeta();
+  trayUI(); grpPlanUI();
+}
+function gotoDay(i) {
+  if (view !== "days") savePos();
+  view = "days"; try { localStorage.setItem(SK + "view", "days"); } catch (e) {}
+  render(); activateDay(i); panDay(i);
+  const h = document.getElementById("dayhead-" + i);
+  // 地圖在手機上是黏在頂端的：頁面還在最上面時算出來的清單頂端不準，所以對齊兩三次直到不再移動
+  if (h) { for (let k = 0; k < 3; k++) { const d = h.getBoundingClientRect().top - (listTop() + 8); if (Math.abs(d) < 1) break; scrollBy({ top: d, behavior: "instant" }); } dayPins(); }
+}
+
+// ── 改行程：拖曳、選單共用 ──
+const dn = i => "第 " + (i + 1) + " 天（" + DAYS[i].md + "）";
+function addStop(id, day, idx) {  // 同一個點只排一天：已經排在別天就移過來
+  DAYS.forEach(d => { const p = plan.days[d.iso]; if (p) p.ids = p.ids.filter(x => x !== id); });
+  const p = dayP(day); idx = idx == null ? p.ids.length : Math.max(0, Math.min(idx, p.ids.length)); p.ids.splice(idx, 0, id);
+}
+function setStay(id, day) { if (day < LAST) dayP(day).stay = id; }
+function afterPlanChange(skipId) {
+  PI = planInfo(); statusOf = computeStatus(); summaryUI(); renderMap();
+  if (view !== "days") refreshListStatus(); else keepPlace(() => renderPlan(), skipId);
+}
+function commitPlan(msg, snap, skipId) {
+  if (JSON.stringify(plan) === snap) { afterPlanChange(skipId); return; }  // 放回原位：沒有改
+  plan.updated = new Date().toISOString(); savePlanLocal(); queuePlanPush();
+  afterPlanChange(skipId); toast(msg, snap);
+}
+let toastT = 0;
+function toast(msg, snap) {
+  let t = document.getElementById("toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+  t.innerHTML = "<span>" + esc(msg) + "</span>" + (snap ? '<button type="button">復原</button>' : "");
+  t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 5000);
+  const b = t.querySelector("button");
+  if (b) b.onclick = () => { plan = JSON.parse(snap); plan.updated = new Date().toISOString(); savePlanLocal(); queuePlanPush(); afterPlanChange(); t.hidden = true; };
+}
+// 放下：src＝{id, kind（list／plan／stay）, day}；t＝{zone（chip／stops／stay）, day, idx}
+function applyDrop(src, t) {
+  const snap = JSON.stringify(plan), id = src.id, name = short(byId[id]), was = PI.dayOf[id];
+  // 具體的旅館只能設成住宿：拖到最後一天（不住）或我的行程的景點區，不改行程
+  if (byId[id].lodging && !(t.zone === "stay" || (t.zone === "chip" && t.day < LAST))) { toast(t.zone === "chip" ? "最後一天不住宿" : "旅館只能拖到「今晚住哪」"); afterPlanChange(); return; }
+  if (src.kind === "plan") dayP(src.day).ids = dayP(src.day).ids.filter(x => x !== id);
+  if (src.kind === "stay" && dayP(src.day).stay === id) dayP(src.day).stay = null;
+  let msg;
+  const toStay = t.zone === "stay" || (t.zone === "chip" && isLodging(byId[id]) && t.day < LAST);
+  if (toStay) { setStay(id, t.day); msg = name + " 設成" + dn(t.day) + "的住宿"; }
+  else {
+    addStop(id, t.day, t.zone === "stops" ? t.idx : null);
+    msg = src.kind === "plan" && src.day === t.day ? "已調整" + dn(t.day) + "的順序" : was !== undefined && was !== t.day ? name + " 從第 " + (was + 1) + " 天移到" + dn(t.day) : "已把 " + name + " 排進" + dn(t.day);
+  }
+  commitPlan(msg, snap, id);
+}
+
+// ── 拖曳（pointer events，觸控、滑鼠、觸控筆都一樣）：按住 ⠿ 移動超過 5px 才開始；沒移動就當成點一下，打開選單 ──
+let drag = null;
+// 滑鼠按住把手拖的時候不要選到文字、不要拖出瀏覽器自己的拖放
+document.addEventListener("selectstart", e => { if (drag) e.preventDefault(); });
+document.addEventListener("dragstart", e => { if (drag) e.preventDefault(); });
+const dropLine = document.createElement("div"); dropLine.className = "dropline";
+// 只在把手上掛 passive 的 pointerdown：iPad 上有非 passive 監聽的區域要先等網頁回應才捲，一忙就滑不動。
+// 把手用 touch-action: none 擋捲動，不用 preventDefault
+function gripDown(e) {
+  const g = e.currentTarget; if (e.pointerType === "mouse" && e.button !== 0) return;
+  if (drag) endDrag();  // 上一次沒收到放開（pointerup／pointercancel）就一直卡著、之後都抓不起來：新的按下就把它清掉
+  const row = g.closest(".mini"); if (!row) return;
+  drag = { id: row.dataset.id, kind: row.dataset.kind, day: row.dataset.day !== undefined ? Number(row.dataset.day) : null, row, g,
+    x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, on: false, pid: e.pointerId, target: null, key: "" };
+  try { g.setPointerCapture(e.pointerId); } catch (_) {}
+  addEventListener("pointermove", dragMove, { passive: true }); addEventListener("pointerup", dragEnd, { passive: true }); addEventListener("pointercancel", dragCancel, { passive: true });
+}
+function dragMove(e) {
+  if (!drag || e.pointerId !== drag.pid) return;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (!drag.on) { if (Math.hypot(drag.x - drag.x0, drag.y - drag.y0) < 5) return; startDrag(); }
+  placeGhost(); hitTest();
+}
+function startDrag() {
+  const s = byId[drag.id], k = drag.kind === "stay" ? "base" : s.cats[0];
+  drag.on = true;
+  if (drag.row.open) drag.row.open = false;
+  const gh = document.createElement("div"); gh.className = "ghost"; gh.setAttribute("aria-hidden", "true");
+  gh.innerHTML = '<span class="gg" style="--c:' + spotBg(s) + '">' + icon(k) + "</span><span>" + esc(short(s)) + "</span>";
+  document.body.appendChild(gh); drag.ghost = gh;
+  drag.row.classList.add("dragsrc"); document.body.classList.add("dragging");
+  drag.raf = requestAnimationFrame(dragTick);
+}
+// 拖曳中的小標籤放在手指左上方，不會被手指擋住
+function placeGhost() { drag.ghost.style.transform = "translate(" + Math.round(drag.x - 20) + "px," + Math.round(drag.y - 54) + "px)"; }
+function hitTest() {
+  const el = document.elementFromPoint(drag.x, drag.y);
+  const chip = el && el.closest(".tchip"), st = el && el.closest(".pstay"), zone = el && el.closest(".pzone");
+  let t = null;
+  if (chip) t = { zone: "chip", day: Number(chip.dataset.day), el: chip };
+  else if (st) t = { zone: "stay", day: Number(st.dataset.day), el: st };
+  else if (zone) {
+    const rows = [...zone.children].filter(r => r.classList.contains("mini") && r !== drag.row);
+    let idx = rows.length;
+    for (let k = 0; k < rows.length; k++) { const r = rows[k].getBoundingClientRect(); if (drag.y < r.top + r.height / 2) { idx = k; break; } }
+    t = { zone: "stops", day: Number(zone.dataset.day), idx, el: zone, before: rows[idx] || null, empty: !rows.length };
+  }
+  const key = t ? t.zone + t.day + ":" + (t.idx === undefined ? "" : t.idx) : "";
+  if (key === drag.key) return;
+  drag.key = key; drag.target = t;
+  document.querySelectorAll(".over").forEach(x => x.classList.remove("over"));
+  dropLine.remove();
+  if (!t) return;
+  t.el.classList.add("over");
+  if (t.zone === "stops" && !t.empty && !t.el.querySelector(".pempty")) t.el.insertBefore(dropLine, t.before);
+}
+// 拖到清單上下緣時自動捲動（我的行程）；拖到底部日期列左右緣時日期列跟著橫向捲（景點清單）
+function dragTick() {
+  if (!drag || !drag.on) return;
+  let dy = 0;
+  if (view === "days") {
+    const top = listTop() + pinH(), bot = innerHeight;
+    if (drag.y < top + 56) dy = -Math.min(20, (top + 56 - drag.y) / 3 + 2); else if (drag.y > bot - 64) dy = Math.min(20, (drag.y - (bot - 64)) / 3 + 2);
+  }
+  if (dy) { scrollBy(0, dy); drag.key = "?"; hitTest(); }
+  const tray = document.getElementById("tray");
+  if (tray && view !== "days") {
+    const r = tray.getBoundingClientRect();
+    if (drag.y > r.top - 40) { const dx = drag.x < r.left + 48 ? -12 : drag.x > r.right - 48 ? 12 : 0; if (dx) { tray.scrollLeft += dx; drag.key = "?"; hitTest(); } }
+  }
+  drag.raf = requestAnimationFrame(dragTick);
+}
+function endDrag() {
+  removeEventListener("pointermove", dragMove); removeEventListener("pointerup", dragEnd); removeEventListener("pointercancel", dragCancel);
+  const d = drag; drag = null;
+  cancelAnimationFrame(d.raf); if (d.ghost) d.ghost.remove();
+  d.row.classList.remove("dragsrc"); document.body.classList.remove("dragging");
+  document.querySelectorAll(".over").forEach(x => x.classList.remove("over")); dropLine.remove();
+  return d;
+}
+function dragEnd(e) {
+  if (!drag || e.pointerId !== drag.pid) return;
+  const d = endDrag();
+  if (!d.on) { openSheet(d.id, d.kind === "list" ? null : { day: d.day, zone: d.kind === "stay" ? "stay" : "stops" }, d.g); return; }
+  if (d.target) applyDrop(d, d.target);
+}
+function dragCancel(e) { if (drag && e.pointerId === drag.pid) endDrag(); }
+
+// ── 選單：排進哪一天／住哪一晚／上下移／移除 ──
+let sheetReturn = null;
+function closeSheet() {
+  const bg = document.getElementById("sheetbg"); if (!bg) return;
+  bg.remove(); document.removeEventListener("keydown", sheetKey);
+  if (sheetReturn && sheetReturn.isConnected) sheetReturn.focus({ preventScroll: true }); sheetReturn = null;
+}
+function sheetKey(e) { if (e.key === "Escape") closeSheet(); }
+function openSheet(id, from, opener) {
+  closeSheet(); sheetReturn = opener || null;
+  const s = byId[id], cur = PI.dayOf[id], stays = PI.stayDays[id] || [], lodge = !!s.lodging;  // 具體的旅館只能設成住宿
+  const status = lodge ? (stays.length ? "住 " + stays.map(i => DAYS[i].md).join("、") : "還沒設成住宿")
+    : (cur !== undefined ? "排在" + dn(cur) : "還沒排進行程") + (stays.length ? "・住 " + stays.map(i => DAYS[i].md).join("、") : "");
+  let acts = "";
+  if (from && from.zone === "stops") {
+    const ids = PI.days[from.day].ids, j = ids.indexOf(id);
+    acts = '<button type="button" class="sb" data-act="up"' + (j <= 0 ? " disabled" : "") + ">上移</button>" +
+      '<button type="button" class="sb" data-act="down"' + (j >= ids.length - 1 ? " disabled" : "") + ">下移</button>" +
+      '<button type="button" class="sb danger" data-act="rm" data-day="' + from.day + '">從第 ' + (from.day + 1) + " 天移除</button>";
+  } else if (from && from.zone === "stay") acts = '<button type="button" class="sb danger" data-act="unstay" data-day="' + from.day + '">取消第 ' + (from.day + 1) + " 天的住宿</button>";
+  else if (cur !== undefined) acts = '<button type="button" class="sb danger" data-act="rm" data-day="' + cur + '">從第 ' + (cur + 1) + " 天移除</button>";
+  if (view === "days") acts += '<button type="button" class="sb" data-act="goto" data-to="' + listOf(s) + '">在' + VIEW_NAME[listOf(s)] + "看 →</button>";
+  else if (cur !== undefined || stays.length) acts += '<button type="button" class="sb" data-act="goto" data-to="days">在我的行程看 →</button>';
+  const rows = DAYS.map((d, i) => {
+    const x = PI.days[i], on = stays.includes(i);
+    // 這天排了哪些景點：直接列名字
+    const info = [x.ids.map(k => short(byId[k])).join("、"), x.stay ? "住 " + short(byId[x.stay]) : "", x.rawH > DATA.max_h ? "⚠️ 開車" + hoursText(x) : ""].filter(Boolean).join("・");
+    return '<div class="srow' + (cur === i || on ? " cur" : "") + '"><span class="sd">第 ' + (i + 1) + " 天 " + esc(d.date) + "<small>" + esc(info || d.note || "還沒排") + "</small></span>" +
+      (lodge ? (i < LAST ? "" : '<span class="sno">最後一天不住</span>')
+        : '<button type="button" class="sb pri" data-act="add" data-day="' + i + '"' + (cur === i ? " disabled" : "") + ">" + (cur === i ? "已排" : cur !== undefined ? "移到這天" : "排進") + "</button>") +
+      (i < LAST ? '<button type="button" class="sb" data-act="stay" data-day="' + i + '" aria-pressed="' + on + '">' + (on ? "✓ 住這晚" : "住這晚") + "</button>" : "") + "</div>";
+  }).join("");
+  const bg = document.createElement("div"); bg.className = "sheet-bg"; bg.id = "sheetbg";
+  bg.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(s.name) + (lodge ? "：住哪一晚" : "：排進哪一天") + '"><div class="sh-top"><h3>' + esc(s.name) + '</h3><button type="button" class="sh-x" data-act="close" aria-label="關閉">' + XICON + "</button></div>" +
+    '<p class="sub">' + esc(status) + "</p>" + (acts ? '<div class="sact">' + acts + "</div>" : "") + '<div class="slist">' + rows + "</div></div>";
+  document.body.appendChild(bg); document.addEventListener("keydown", sheetKey);
+  bg.addEventListener("click", e => {
+    if (e.target === bg) { closeSheet(); return; }
+    const b = e.target.closest("button[data-act]"); if (!b || b.disabled) return;
+    const a = b.dataset.act, i = Number(b.dataset.day), snap = JSON.stringify(plan), name = short(s);
+    if (a === "close") { closeSheet(); return; }
+    if (a === "goto") { closeSheet(); jumpTo(id, b.dataset.to); return; }
+    let msg = "";
+    if (a === "add") { addStop(id, i); msg = cur !== undefined ? name + " 從第 " + (cur + 1) + " 天移到" + dn(i) : "已把 " + name + " 排進" + dn(i); }
+    else if (a === "stay") { if (on(i)) { dayP(i).stay = null; msg = "取消" + dn(i) + "住 " + name; } else { setStay(id, i); msg = name + " 設成" + dn(i) + "的住宿"; } }
+    else if (a === "up" || a === "down") { const ids = dayP(from.day).ids, j = ids.indexOf(id), k = j + (a === "up" ? -1 : 1); ids.splice(j, 1); ids.splice(k, 0, id); msg = "已調整" + dn(from.day) + "的順序"; }
+    else if (a === "rm") { dayP(i).ids = dayP(i).ids.filter(x => x !== id); msg = "已把 " + name + " 從" + dn(i) + "移除"; }
+    else if (a === "unstay") { dayP(i).stay = null; msg = "取消" + dn(i) + "的住宿"; }
+    closeSheet(); commitPlan(msg, snap);
+    function on(k) { return dayP(k).stay === id; }
+  });
+  const sl = bg.querySelector(".slist"), curRow = bg.querySelector(".srow.cur"); if (curRow) sl.scrollTop = curRow.offsetTop - sl.offsetTop - sl.clientHeight / 2;
+  (bg.querySelector(".sact button:not(:disabled)") || bg.querySelector(".srow button:not(:disabled)")).focus({ preventScroll: true });
+}
+// 星號：按鈕、地圖上的藍星、計數；只看已加星號時重畫（取消的點要消失）
+function setStars(ids, on) {
+  ids.forEach(id => { if (on) starSet.add(id); else starSet.delete(id); });
+  starAt = new Date().toISOString(); saveStarsLocal(); queuePush();
+  if (starOnly) keepPlace(() => render()); else { paintStars(); catsUI(); }
+}
+function paintStars() {
+  document.querySelectorAll("[data-star]").forEach(b => { const on = starSet.has(b.dataset.star), t = on ? "取消星號" : "加星號（想去）";
+    if (b.getAttribute("aria-pressed") !== String(on)) { b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", t); b.title = t; } });
+  marks.forEach(mk => { const e = pinEl(mk.id); if (e) e.classList.toggle("starred", starSet.has(mk.id)); });
+  document.querySelectorAll("[data-starcount]").forEach(el => { el.textContent = starSet.size; });
+  document.querySelectorAll("[data-grpstar]").forEach(el => { const n = [...starSet].filter(id => byId[id] && grpKey(byId[id]) === el.dataset.grpstar).length; el.textContent = n ? "★ " + n : ""; });
+}
+// 星號同步：在 claude.ai 上存進 artifact 資料庫；其他地方打開只存在瀏覽器
+let starRef = null, starBusy = false, starAgain = false, starTimer = 0, syncText = "星號存在這個瀏覽器";
+function syncUI(t) { syncText = t; const el = document.getElementById("starsync"); if (el) el.textContent = t; }
+function saveStarsLocal() { try { localStorage.setItem(SK + "stars", JSON.stringify([...starSet])); localStorage.setItem(SK + "stars-at", starAt); } catch (e) {} }
+function queuePush() { if (!starRef) return; clearTimeout(starTimer); starTimer = setTimeout(pushStars, 700); }  // 連按幾下只寫一次
+async function pushStars(retry) {
+  if (!starRef) return;
+  if (starBusy) { starAgain = true; return; }
+  starBusy = true; syncUI("同步中…");
+  let again = false;
+  try { await starRef.set({ ids: [...starSet].sort(), updated: starAt }); syncUI("已同步到 claude.ai，Claude 讀得到"); }
+  catch (e) { if (e && e.code === "unavailable" && !retry) again = true; else syncUI("同步失敗，星號先存在這個瀏覽器"); }
+  starBusy = false;
+  if (again) setTimeout(() => pushStars(true), 1200 + Math.random() * 1200);
+  else if (starAgain) { starAgain = false; pushStars(); }
+}
+function remoteStars(d) {
+  if (!d || !Array.isArray(d.ids) || String(d.updated || "") <= starAt) return false;
+  starSet = new Set(d.ids.filter(id => byId[id])); starAt = String(d.updated); saveStarsLocal();
+  if (starOnly) keepPlace(() => render()); else { paintStars(); catsUI(); }
+  return true;
+}
+// 行程同步：同星號（plan/itinerary）
+let planRef = null, planBusy = false, planAgain = false, planTimer = 0, planSyncText = "行程存在這個瀏覽器";
+function planSyncUI(t) { planSyncText = t; const el = document.getElementById("plansync"); if (el) el.textContent = t; }
+function savePlanLocal() { try { localStorage.setItem(SK + "plan", JSON.stringify(plan)); } catch (e) {} }
+function planDoc() {  // 資料庫裡的格式：days 以日期為鍵，{ids: 景點 id（照順序）, stay: 住宿 id}；沒排東西的天不存
+  const days = {};
+  DAYS.forEach(d => { const p = plan.days[d.iso]; if (p && (p.ids.length || p.stay)) days[d.iso] = p.stay ? { ids: p.ids.slice(), stay: p.stay } : { ids: p.ids.slice() }; });
+  return { days, updated: plan.updated };
+}
+function queuePlanPush() { if (!planRef) return; clearTimeout(planTimer); planTimer = setTimeout(pushPlan, 700); }
+async function pushPlan(retry) {
+  if (!planRef) return;
+  if (planBusy) { planAgain = true; return; }
+  planBusy = true; planSyncUI("同步中…");
+  let again = false;
+  try { await planRef.set(planDoc()); planSyncUI("已同步到 claude.ai，Claude 讀得到"); }
+  catch (e) { if (e && e.code === "unavailable" && !retry) again = true; else planSyncUI("同步失敗，行程先存在這個瀏覽器"); }
+  planBusy = false;
+  if (again) setTimeout(() => pushPlan(true), 1200 + Math.random() * 1200);
+  else if (planAgain) { planAgain = false; pushPlan(); }
+}
+function remotePlan(d) {
+  if (!d || typeof d.days !== "object" || String(d.updated || "") <= plan.updated) return false;
+  if (drag) { setTimeout(() => remotePlan(d), 800); return false; }  // 拖曳中先不換
+  plan = cleanPlan(d); savePlanLocal(); afterPlanChange();
+  return true;
+}
+// 連上 claude.ai 的資料庫：星號（plan/stars）和行程（plan/itinerary）
+async function connectDoc(db, path, o) {
+  const ref = db.doc(path);
+  const timer = setTimeout(() => o.ui("暫時連不上 claude.ai，" + o.what + "先存在這個瀏覽器"), 10000);
+  try {
+    const snap = await ref.get(); clearTimeout(timer);
+    const d = snap.exists ? snap.data() : null;
+    o.setRef(ref);
+    if (o.remote(d)) o.ui("已同步到 claude.ai，Claude 讀得到");
+    else if ((!d && o.hasLocal()) || (d && String(d.updated || "") < o.at())) o.push();  // 瀏覽器裡的比較新
+    else o.ui("已連上 claude.ai，Claude 讀得到");
+    ref.onSnapshot(x => { if (!x.metadata.hasPendingWrites && x.exists) o.remote(x.data()); }, () => {});  // 別的裝置改了
+  } catch (e) { clearTimeout(timer); o.ui("連不上 claude.ai，" + o.what + "只存在這個瀏覽器"); }
+}
+(async () => {
+  if (!window.claude || typeof window.claude.use !== "function") return;
+  let db = null;
+  try { db = await window.claude.use("db"); } catch (e) {}
+  if (!db) return;
+  connectDoc(db, "plan/stars", { what: "星號", ui: syncUI, setRef: r => { starRef = r; }, remote: remoteStars, hasLocal: () => starSet.size > 0, at: () => starAt, push: () => pushStars() });
+  connectDoc(db, "plan/itinerary", { what: "行程", ui: planSyncUI, setRef: r => { planRef = r; }, remote: remotePlan, hasLocal: () => Object.keys(planDoc().days).length > 0, at: () => plan.updated, push: () => pushPlan() });
+})();
+function planText() {
+  const out = [PAGE.short + "：我的行程（開車時數是" + (NET ? "沿 OpenStreetMap 道路估算，不含塞車、天候" : "直線估算") + "，停留時間是 Claude 估計）"];
+  DAYS.forEach((d, i) => {
+    const x = PI.days[i]; if (!x.ids.length && !x.stay) return;
+    const vt = dayVisitText(x);
+    out.push("", "第 " + (i + 1) + " 天 " + d.date + ((x.pts.length || vt) ? "：" + [x.pts.length ? "開車" + hoursText(x) + "（約 " + x.km + " km）" : "", vt].filter(Boolean).join("，") : ""));
+    x.ids.forEach(id => out.push("- " + byId[id].name + "〔" + id + "〕" + (byId[id].visit ? "（停留 " + visitText(byId[id].visit) + "）" : "")));
+    if (x.stay) out.push("- 住：" + byId[x.stay].name + "〔" + x.stay + "〕");
+  });
+  return out.join("\n");
+}
+async function copyText(btn, t, ta, label) {
+  try { await navigator.clipboard.writeText(t); btn.textContent = "已複製"; setTimeout(() => { btn.textContent = label; }, 1600); }
+  catch (e) { ta.hidden = false; ta.value = t; ta.focus(); ta.select(); btn.textContent = "請手動複製下面的文字"; }
+}
+function starText() {
+  const ids = [...starSet].filter(id => byId[id]);
+  const prefs = PREF_ORDER.concat([...new Set(ids.map(id => pf1(byId[id])))].filter(x => !PREF_ORDER.includes(x)));
+  const out = [PAGE.short + "：加星號的景點（" + ids.length + " 個）"];
+  prefs.forEach(pf => { const g = ids.filter(id => pf1(byId[id]) === pf); if (g.length) { out.push("", pf); g.forEach(id => out.push("- " + byId[id].name + "〔" + id + "〕")); } });
+  return out.join("\n");
+}
+// 清單可見範圍的頂端：桌面是篩選列下緣，手機是固定地圖下緣；捲進某天後再加上精簡列（--pin-h）
+// 閱讀線＝精簡列下緣往下 64px：按篩選、換分頁時用它記住看到哪一列，「這天」用它找正在看的那天
+let scrollItems = [], pinQueued = false;
+const mobileMap = () => !matchMedia("(min-width: 960px)").matches && !document.body.classList.contains("map-hidden");
+function listTop() { return (mobileMap() ? document.querySelector(".mapwrap").getBoundingClientRect().bottom : tb.offsetHeight) + fbar.offsetHeight; }
+const pinH = () => parseFloat(cssC("--pin-h")) || 0;
+function readingLine() { return Math.round(listTop() + pinH() + 64); }
+// 精簡列的漸變程度 p（0～1）跟著捲動位置走：大標題最後一段捲到它後面時淡入，被下一天推走時淡出；
+// 文字比底色晚一點出現，半透明時不和底下的字疊在一起
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x, ease = x => x * x * (3 - 2 * x);
+function dayPins() {
+  if (view !== "days") return;
+  const lt = LT, H = pinH();
+  for (const sec of document.querySelectorAll("#list .day")) {
+    const r = sec.getBoundingClientRect(), bar = sec.firstElementChild;
+    let p = 0, prog = 0;
+    if (r.bottom > 0 && r.top < innerHeight) {
+      const pinBottom = Math.min(Math.max(r.top, lt) + H, r.bottom);  // 固定後的位置
+      const hb = bar.nextElementSibling.getBoundingClientRect().bottom;
+      p = Math.min(clamp01((pinBottom + H - hb) / H), clamp01((r.bottom - lt) / H));
+      // 這天讀到哪裡：大標題捲完＝0，這天最後一張捲過精簡列＝1
+      prog = clamp01((lt + H - hb) / Math.max(1, r.bottom - hb));
+      // 整天一個畫面放得下（不會捲出可見範圍）就不出現
+      if (r.height <= innerHeight - lt + 1) p = prog = 0;
+    }
+    prog = Math.round(prog * 400) / 400;
+    if (bar._prog !== prog) { bar._prog = prog; bar.style.setProperty("--prog", prog); }
+    p = Math.round(p * 50) / 50;
+    if (bar._p === p) continue;
+    bar._p = p;
+    bar.style.setProperty("--pe", ease(p).toFixed(3));
+    bar.style.setProperty("--pt", ease(clamp01((p - .35) / .65)).toFixed(3));
+    bar.classList.toggle("on", p >= .5);
+  }
+}
+// 捲動時只更新精簡列（我的行程），不選、不移地圖
+addEventListener("scroll", () => {
+  if (view !== "days" || pinQueued) return; pinQueued = true;
+  requestAnimationFrame(() => { pinQueued = false; dayPins(); });
+}, { passive: true });
+// 推薦度：用和圖例、卡片一樣的說法（必去／推薦／有空再去）
+function filters() {
+  const opts = [[1, "推薦度：全部"], [3, "有空再去以上"], [4, "推薦以上"], [5, "只看必去"]];
+  const sel = document.getElementById("tiersel");
+  sel.innerHTML = opts.map(([v, t]) => '<option value="' + v + '"' + (v === minTier ? " selected" : "") + ">" + t + "</option>").join("");
+  sel.classList.toggle("on", minTier > 1);
+}
+document.getElementById("tiersel").addEventListener("change", e => keepPlace(() => setTier(Number(e.target.value))));
+// 類別：數字是符合目前推薦度條件的景點數，0 個的變灰不能按
+function catsUI() {
+  const box = document.getElementById("cats");
+  const base = DATA.spots.filter(s => s.id !== HOME && !isLodging(s));
+  const pool = base.filter(s => tierOk(s) && (!starOnly || starSet.has(s.id)));
+  const n = k => pool.filter(s => s.cats.includes(k)).length;
+  box.innerHTML = '<button type="button" class="chipbtn starchip" data-staronly aria-pressed="' + starOnly + '"' + (starSet.size || starOnly ? "" : " disabled") + ">" + STAR_SVG.replace("<svg", '<svg class="ic"') + '已加星號<span class="n" data-starcount>' + starSet.size + "</span></button>" +
+    '<span class="tb-sep" aria-hidden="true"></span><button type="button" class="chipbtn" data-cat="" aria-pressed="' + (!catOn.size) + '">全部<span class="n">' + pool.length + "</span></button>" +
+    CATS.filter(c => c[0] !== "base").map(([k, g, label]) => { const c = n(k), on = catOn.has(k);
+      return '<button type="button" class="chipbtn" data-cat="' + k + '" aria-pressed="' + on + '"' + (c || on ? "" : " disabled") + ">" + icon(k) + esc(label) + '<span class="n">' + c + "</span></button>"; }).join("");
+  box.querySelector("[data-staronly]").addEventListener("click", () => {
+    starOnly = !starOnly; try { localStorage.setItem(SK + "star-only", starOnly ? "1" : "0"); } catch (e) {}
+    keepPlace(() => render());
+  });
+  box.querySelectorAll("button[data-cat]").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.cat;
+    if (!k) catOn.clear(); else if (catOn.has(k)) catOn.delete(k); else catOn.add(k);
+    try { localStorage.setItem(SK + "cats", JSON.stringify([...catOn])); } catch (e) {}
+    keepPlace(() => render());
+  }));
+  rowFade();
+}
+// 按篩選、改行程時畫面不跳：閱讀線上那張還在就原地不動；被篩掉了就把那天的大標題對齊到清單頂端。
+// skipId：剛被拖走的點不當基準（不然畫面會跟著它跳到別天）
+function keepPlace(fn, skipId) {
+  const line = readingLine();
+  let anchor = null;
+  for (const el of scrollItems) { if (el.getBoundingClientRect().top <= line) { if (!skipId || el.dataset.id !== skipId) anchor = el; } else break; }
+  if (!anchor) { fn(); return; }
+  const aid = anchor.id, top0 = anchor.getBoundingClientRect().top, day = anchor.closest(".day"), di = day ? day.dataset.day : null;
+  fn();
+  const el = aid && document.getElementById(aid);
+  if (el) scrollBy({ top: el.getBoundingClientRect().top - top0, behavior: "auto" });
+  else { const dh = document.getElementById("dayhead-" + di); if (dh) scrollBy({ top: dh.getBoundingClientRect().top - (listTop() + 8), behavior: "auto" }); }
+  dayPins();
+}
+// 換檢視時各自回到上次的位置：記閱讀線上那一列（錨點）和展開了哪幾張，不記捲動像素，另一頁改了行程也對得準。
+// 錨點被篩掉就回原來的捲動位置；錨點被移到別天就對回原來那一天
+const viewPos = {};
+function savePos() {
+  const line = readingLine(); let a = null;
+  for (const el of scrollItems) { if (el.getBoundingClientRect().top <= line) a = el; else break; }
+  const day = a && a.closest(".day");
+  viewPos[view] = { y: scrollY, id: a ? a.id : null, rel: a ? a.getBoundingClientRect().top - line : 0,
+    day: day ? day.id : null, dayRel: day ? day.getBoundingClientRect().top - line : 0,
+    open: [...document.querySelectorAll("#list .mini[open]")].map(c => c.id) };
+}
+// 我的行程 ⇄ 景點清單：跳到同一個點在另一頁的位置；原本那頁照樣記住位置。
+// 被篩選藏起來就清除篩選、收合的縣先展開；只住不玩的點跳到第一晚的「今晚住哪」
+function jumpTo(id, to) {
+  const s = byId[id]; if (!s || view === to) return;
+  if (to === "days" && PI.dayOf[id] === undefined && !PI.stayDays[id]) { toast(short(s) + " 還沒排進行程"); return; }
+  let msg = "";
+  if (to === "list" && !visible(s)) { clearFilters(); msg = "已清除篩選，才看得到 " + short(s); }
+  savePos();
+  view = to; try { localStorage.setItem(SK + "view", to); } catch (e) {}
+  render();
+  if (to !== "days" && folded.has(grpKey(s))) setFold([grpKey(s)], false);
+  const el = to !== "days" ? document.getElementById("card-" + id)
+    : PI.dayOf[id] !== undefined ? document.querySelector('#list .mini[data-kind="plan"][data-id="' + id + '"]') : document.getElementById("stay-" + PI.stayDays[id][0]);
+  if (!el) return;
+  // 手機上地圖黏在頂端：對齊兩三次直到不再移動
+  for (let k = 0; k < 3; k++) { const d = el.getBoundingClientRect().top - (listTop() + pinH() + 8); if (Math.abs(d) < 1) break; scrollBy({ top: d, behavior: "instant" }); }
+  select(id, false, el); dayPins();
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  setTimeout(() => el.classList.remove("flash"), 1700);
+  el.querySelector("summary").focus({ preventScroll: true });
+  if (msg) toast(msg);
+}
+// 「頂端」是清單開頭，不是整頁最上面：沒記錄或對回去比清單開頭還上面就回清單開頭；只有切換前就在頁首才留在頁首
+const listStartY = () => Math.round(document.querySelector("main").getBoundingClientRect().top + scrollY - tb.offsetHeight);
+function restorePos(y0) {  // y0＝切換前的捲動位置
+  const p = viewPos[view], wasDown = y0 > listStartY() + 4;
+  const fin = () => { if (wasDown && scrollY < listStartY() - 4) scrollTo({ top: listStartY(), behavior: "instant" }); dayPins(); };
+  if (!p || !p.id) { if (wasDown) scrollTo({ top: listStartY(), behavior: "instant" }); fin(); return; }
+  p.open.forEach(id => { const c = document.getElementById(id); if (c && !c.open) { c.dataset.quiet = "1"; fillMini(c); c.open = true; } });  // 展開不算選取
+  let el = p.id && document.getElementById(p.id), rel = p.rel;
+  if (el && p.day && (!el.closest(".day") || el.closest(".day").id !== p.day)) el = null;
+  if (!el && p.day) { el = document.getElementById(p.day); rel = p.dayRel; }
+  // 手機上地圖黏在頂端：頁面還在最上面時閱讀線會跟著捲動變，所以對齊兩三次直到不再移動
+  if (el) { for (let k = 0; k < 3; k++) { const d = el.getBoundingClientRect().top - (readingLine() + rel); if (Math.abs(d) < 1) break; scrollBy({ top: d, behavior: "instant" }); } }
+  else scrollTo({ top: p.y, behavior: "instant" });
+  fin();
+}
+// 有篩選時，篩選列開頭多一顆「清除」，順便顯示剩幾個
+const XICON = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+function shownUI(n, total) {
+  const active = minTier > 1 || catOn.size || starOnly;
+  const box = document.getElementById("shown");
+  box.hidden = !active;
+  box.innerHTML = active ? '<button type="button" class="chipbtn clear">' + XICON + "清除（顯示 " + n + " / " + total + "）</button>" : "";
+  const b = box.querySelector("button");
+  if (b) b.addEventListener("click", () => keepPlace(() => { clearFilters(); render(); }));
+}
+function clearFilters() {
+  catOn.clear(); starOnly = false; minTier = 1;
+  try { localStorage.setItem(SK + "cats", "[]"); localStorage.setItem(SK + "star-only", "0"); localStorage.setItem(SK + "min-tier", "1"); } catch (e) {}
+  filters();
+}
+function setTier(v) {
+  minTier = v;
+  try { localStorage.setItem(SK + "min-tier", String(v)); } catch (e) {}
+  filters(); render();
+}
+// 圖例（地圖左下，可收合）
+function legend() {
+  const el = document.getElementById("legend"); if (!el) return;
+  const dot = j => '<span><i class="lg-dot" style="background:' + tierBg(j) + '"></i>' + TIER[j] + "</span>";
+  el.innerHTML =
+    '<div class="lg-row">' + [5, 4, 3, 2, 1].map(dot).join("") + "</div>" +
+    '<div class="lg-row"><span><i class="lg-num">1</i>排進行程的景點（數字＝順序，顏色＝推薦度）</span></div>' +
+    (view === "days" ? "" : '<div class="lg-row"><span><i class="lg-sdot"></i>還沒排的景點（點一下排進行程）</span><span><i class="lg-near">' + icon("onsen") + '</i>放大地圖後換成類別符號（擠在一起的先是小點，放到最大會挪到旁邊、用細線連回實際位置）</span></div>') +
+    '<div class="lg-row"><span><i class="lg-stay">' + icon("base") + '</i>住宿・旅館（起＝' + esc(short(byId[HOME])) + '）</span><span><i class="lg-starred">★</i>已加星號</span></div>' +
+    '<div class="lg-row"><span><i class="lg-line"></i>這天路線</span><span><i class="lg-line dim"></i>其他天</span><span><i class="lg-road"></i>高速公路</span><span><i class="lg-nat"></i>國道</span><span><i class="lg-rail"></i>鐵路</span></div>';
+}
+
+document.getElementById("list").addEventListener("click", e => {
+  // 拖曳把手：拖曳和點一下（開選單）在 pointerup 處理，這裡只擋掉展開那一列；用鍵盤按的（detail 0）才在這裡開選單
+  const g = e.target.closest(".grip");
+  if (g) { e.preventDefault(); e.stopPropagation(); if (e.detail === 0) { const r = g.closest(".mini"); openSheet(r.dataset.id, r.dataset.kind === "list" ? null : { day: Number(r.dataset.day), zone: r.dataset.kind === "stay" ? "stay" : "stops" }, g); } return; }
+  const jb = e.target.closest("[data-jump]");
+  if (jb) { e.preventDefault(); e.stopPropagation(); jumpTo(jb.closest(".mini").dataset.id, jb.dataset.jump); return; }
+  const gh = e.target.closest(".grp-h");
+  if (gh) { setFold([gh.dataset.grp], gh.getAttribute("aria-expanded") === "true"); return; }
+  const m = e.target.closest("[data-menu]");
+  if (m) { e.preventDefault(); e.stopPropagation(); openSheet(m.dataset.menu, m.dataset.zone ? { day: Number(m.dataset.day), zone: m.dataset.zone } : null, m); return; }
+  const b = e.target.closest("[data-star]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  setStars([b.dataset.star], !starSet.has(b.dataset.star));
+}, true);
+// 檢視：我的行程／景點清單／住宿清單（各自記住上次看到哪裡）
+VIEWS.forEach(v => document.getElementById("view-" + v).addEventListener("click", () => {
+  if (view === v) return;
+  const y0 = scrollY; savePos();
+  view = v; try { localStorage.setItem(SK + "view", v); } catch (e) {}
+  render(); restorePos(y0);
+}));
+// 篩選列放不下時左右滑：右邊還有內容就淡出；滑鼠直向滾輪也能橫向捲（捲到底就交還給整頁捲動）
+function rowFade() { document.querySelectorAll(".tb-row").forEach(r => r.classList.toggle("more", r.scrollLeft + r.clientWidth < r.scrollWidth - 2)); }
+document.querySelectorAll(".tb-row").forEach(r => {
+  r.addEventListener("scroll", rowFade, { passive: true });
+  r.addEventListener("wheel", e => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    const canL = r.scrollLeft > 0, canR = r.scrollLeft + r.clientWidth < r.scrollWidth - 1;
+    if ((e.deltaY > 0 && canR) || (e.deltaY < 0 && canL)) { r.scrollLeft += e.deltaY; e.preventDefault(); }
+  }, { passive: false });
+});
+// 篩選列高度（會因換行改變）存成 --tb，地圖欄和卡片捲動位置都用它
+const tb = document.getElementById("toolbar"), fbar = document.getElementById("fbar");
+const mapwrap = document.querySelector(".mapwrap");
+let LT = 0;  // 清單可見範圍的頂端（頂端列＋手機上固定的地圖＋景點清單的篩選列），也存成 CSS 的 --lt；篩選列黏在 --lt0（不含它自己）
+const setLt = () => { const lt0 = tb.offsetHeight + (mobileMap() ? mapwrap.offsetHeight : 0); LT = lt0 + fbar.offsetHeight;
+  document.documentElement.style.setProperty("--lt0", lt0 + "px"); document.documentElement.style.setProperty("--lt", LT + "px"); delete cssCache["--pin-h"]; dayPins(); };
+const setTb = () => { document.documentElement.style.setProperty("--tb", tb.offsetHeight + "px"); setLt(); map.invalidateSize(); fitMinZoom(); rowFade(); scheduleLayout(); };
+if ("ResizeObserver" in window) { new ResizeObserver(setTb).observe(tb); new ResizeObserver(setLt).observe(mapwrap); new ResizeObserver(setLt).observe(fbar); } else window.addEventListener("resize", setTb);
+// 手機：地圖固定在篩選列下方，可以收起
+const mt = document.getElementById("maptoggle");
+mt.addEventListener("click", () => { const h = document.body.classList.toggle("map-hidden"); mt.setAttribute("aria-pressed", String(!h)); mt.textContent = h ? "顯示地圖" : "收起地圖"; setLt(); if (!h) setTimeout(() => map.invalidateSize(), 50); });
+drawBase(); filters(); legend(); render(); fitAll(); setTb(); loadRoads();
+const rerender = () => { drawBase(); legend(); render(); };
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender);
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>

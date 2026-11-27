@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "逐日行程：trips/<旅程>/itinerary.json",
+  "description": "一天一項，依日期排；營業時間、票價等事實放 research/，這裡用連結引用。產生 itinerary.md。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["days"],
+  "properties": {
+    "summary": {
+      "$ref": "common.schema.json#/$defs/text",
+      "description": "表格上方：照哪一版的行程整理、交通時間怎麼估、是不是草案"
+    },
+    "days": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["date"],
+        "properties": {
+          "date": {"$ref": "common.schema.json#/$defs/date"},
+          "day_note": {"type": "string", "minLength": 1, "description": "日期旁的補充，例如國定假日的名稱"},
+          "plan": {"$ref": "common.schema.json#/$defs/text", "description": "去哪；括號寫當天要趕的時間（最後入場、入住期限）"},
+          "stay": {"$ref": "common.schema.json#/$defs/text", "description": "住哪；和前一天相同時清單顯示「同上」"},
+          "travel": {"$ref": "common.schema.json#/$defs/text", "description": "交通：距離、時間、抵達時間"},
+          "places": {
+            "type": "array",
+            "items": {"$ref": "common.schema.json#/$defs/place_ref"},
+            "description": "這天依序去的地點（places/<id>.json）；check 會提醒其中查詢日期過期的"
+          },
+          "stay_place": {"$ref": "common.schema.json#/$defs/place_ref", "description": "這晚住的地點（places/<id>.json）"}
+        }
+      }
+    },
+    "notes": {"$ref": "common.schema.json#/$defs/text", "description": "表格下方的補充"}
+  }
+}

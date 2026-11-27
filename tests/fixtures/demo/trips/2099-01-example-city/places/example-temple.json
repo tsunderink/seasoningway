@@ -1,0 +1,29 @@
+{
+  "id": "example-temple",
+  "name": "範例寺",
+  "local_name": "見本寺",
+  "region": "範例縣",
+  "location": {
+    "lat": 30.02,
+    "lon": 140.04,
+    "approximate": true
+  },
+  "categories": [
+    "sight"
+  ],
+  "summary": "河堤步道南端的寺院，有一座紅磚拱橋",
+  "season": {
+    "tier": 3,
+    "why": "雪景普通，順路才去"
+  },
+  "ratings": [
+    {
+      "site": "example-site",
+      "score": 4.3,
+      "scale": 5,
+      "reviews": 120,
+      "url": "https://example.com/example-temple"
+    }
+  ],
+  "as_of": "2098-11-10"
+}

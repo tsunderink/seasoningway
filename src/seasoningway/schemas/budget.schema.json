@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "預算：trips/<旅程>/budget.json",
+  "description": "金額和匯率。seasoningway budget <旅程> 計算並產生 budget.md。大項（機票、住宿、交通票券）一筆一項；餐飲、雜支用每日概算（單價 × 天數，scope 每人）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rates", "items"],
+  "properties": {
+    "rates": {
+      "type": "array",
+      "description": "匯率：1 單位外幣 = rate 單位基準幣別；基準幣別不用列",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["currency", "rate", "as_of", "source"],
+        "properties": {
+          "currency": {"$ref": "common.schema.json#/$defs/currency"},
+          "rate": {"type": "number", "exclusiveMinimum": 0},
+          "as_of": {"$ref": "common.schema.json#/$defs/as_of", "description": "匯率的查詢日期；過期了，用來做決定前要重查"},
+          "source": {"$ref": "common.schema.json#/$defs/source"}
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "item", "unit_amount", "currency", "status", "as_of"],
+        "properties": {
+          "category": {"type": "string", "minLength": 1, "description": "交通、住宿、餐飲、門票活動、購物、雜支等"},
+          "item": {
+            "type": "string",
+            "minLength": 1,
+            "description": "已經訂了、實付金額還沒補的：status 寫預估，item 寫「（已訂，金額待補）」，會算進已訂合計"
+          },
+          "unit_amount": {"type": "number"},
+          "currency": {"$ref": "common.schema.json#/$defs/currency", "description": "不是基準幣別的要在 rates 有匯率"},
+          "qty": {"type": "number", "exclusiveMinimum": 0, "description": "天數、晚數；沒寫＝1。金額 = unit_amount × qty"},
+          "scope": {"enum": ["全體", "每人"], "description": "每人：金額再乘人數；沒寫＝全體"},
+          "status": {"enum": ["預估", "已訂", "實付"], "description": "實付只在旅後每類記一筆概算"},
+          "as_of": {"$ref": "common.schema.json#/$defs/as_of", "description": "查詢或記錄日期；預估過期了，用來做決定前要重查"},
+          "source": {"$ref": "common.schema.json#/$defs/source", "description": "自己的概算不用寫"},
+          "note": {"$ref": "common.schema.json#/$defs/text"}
+        }
+      }
+    }
+  }
+}

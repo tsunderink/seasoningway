@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "地圖頁設定：trips/<旅程>/map/config.json",
+  "description": "地圖頁（seasoningway.tripmap）這趟旅程的設定：標題、類別、評分網站、旅行月份、開車參數、底圖範圍。景點是 places/*.json，日期取旅程 README 開頭的 start、end。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "short_title", "storage_prefix", "home", "categories", "season", "drive", "basemap"],
+  "properties": {
+    "title": {"type": "string", "minLength": 1, "description": "頁面標題（瀏覽器分頁）"},
+    "heading": {"type": "string", "minLength": 1, "description": "頁首大標；沒寫＝short_title 加「：我的行程」"},
+    "short_title": {"type": "string", "minLength": 1, "description": "短標題，用在「複製行程文字」「複製星號清單」的第一行"},
+    "storage_prefix": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "瀏覽器 localStorage 的鍵名前綴；改了使用者瀏覽器裡的行程、星號、篩選就讀不到，發布後不要改"
+    },
+    "home": {"$ref": "common.schema.json#/$defs/place_ref", "description": "起終點（抵達、回程的城市）；第一天從這裡出發"},
+    "region_order": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "description": "景點清單、住宿清單的分組順序（地點的 region）；沒列到的排在後面"
+    },
+    "holidays": {
+      "type": "object",
+      "propertyNames": {"$ref": "common.schema.json#/$defs/date"},
+      "additionalProperties": {"type": "string", "minLength": 1},
+      "description": "當地的國定假日：日期 → 名稱，顯示在日期旁"
+    },
+    "notes": {
+      "type": "object",
+      "propertyNames": {"$ref": "common.schema.json#/$defs/date"},
+      "additionalProperties": {"type": "string", "minLength": 1},
+      "description": "每天的固定事項（抵達、取還車、已訂的入住），顯示在那天的標題下；決定本身寫在旅程 README「已決定」"
+    },
+    "preset": {
+      "type": "object",
+      "propertyNames": {"$ref": "common.schema.json#/$defs/date"},
+      "additionalProperties": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/place_ref"}},
+      "description": "使用者還沒有自己的行程時，預先放進那天的點（例如已訂門票的景點）"
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lat", "lon", "zoom"],
+      "description": "地圖一開始的中心和縮放；沒寫＝全部地點的中心、縮放 6",
+      "properties": {
+        "lat": {"type": "number", "minimum": -90, "maximum": 90},
+        "lon": {"type": "number", "minimum": -180, "maximum": 180},
+        "zoom": {"type": "number", "minimum": 0, "maximum": 20}
+      }
+    },
+    "season": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "tiers"],
+      "description": "地點 season 的意思",
+      "properties": {
+        "label": {"type": "string", "minLength": 1, "description": "旅行的月份或季節，例如「1 月」；卡片寫「1 月推薦度」「1 月：注意事項」"},
+        "tiers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["1", "2", "3", "4", "5"],
+          "patternProperties": {"^[1-5]$": {"type": "string", "minLength": 1}},
+          "description": "推薦度每一級的意思（5＝最值得專程去，1＝這時候去不划算或去不了）"
+        }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "minItems": 1,
+      "description": "類別，篩選按鈕和卡片用同一個名稱；base（住宿）、car（租車取還）有固定的行為。圖示依 id 取 seasoningway.tripmap 內建的，沒有的用圓點",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "glyph", "name"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+          "glyph": {"type": "string", "minLength": 1, "maxLength": 2, "description": "一個字的簡稱"},
+          "name": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "ratings": {
+      "type": "array",
+      "description": "評分網站，卡片依這個順序列；第一個網站的評論數用來排清單",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["site", "name"],
+        "properties": {
+          "site": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "地點 ratings 的 site"},
+          "name": {"type": "string", "minLength": 1, "description": "顯示名稱"},
+          "about": {"type": "string", "minLength": 1, "description": "這個分數代表誰的意見，寫在框的標題括號裡"},
+          "missing": {"type": "string", "minLength": 1, "description": "地點沒有這個網站的分數時也顯示這一框，寫這句；沒寫＝沒有就不顯示"},
+          "brief": {"type": "boolean", "description": "清單的列上顯示第一個分數"}
+        }
+      }
+    },
+    "ratings_note": {"type": "string", "minLength": 1, "description": "頁尾「評分查詢於…：」後面的說明（滿分、讀自搜尋結果等）"},
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "地圖 App 搜尋文字和 Place ID 查詢（place_ids.py）",
+      "properties": {
+        "language": {"type": "string", "minLength": 2, "description": "Google 搜尋的語言，例如 ja"},
+        "region_code": {"type": "string", "pattern": "^[A-Z]{2}$", "description": "Google 搜尋的國家，例如 JP"},
+        "region_replace": {
+          "type": "array",
+          "items": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}], "minItems": 2, "maxItems": 2},
+          "description": "地區名稱換成當地寫法（[原本, 換成]），例如 [\"縣\", \"県\"]；搜尋文字＝原文名稱＋換過的地區"
+        }
+      }
+    },
+    "drive": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "自駕：開車時數的估法和每天的上限（目前只支援自駕；只有租車取車點到還車點之間算開車）",
+      "required": ["max_hours"],
+      "properties": {
+        "max_hours": {"type": "number", "exclusiveMinimum": 0, "description": "每天開車上限（小時），超過標 ⚠️"},
+        "day_start": {"type": "string", "pattern": "^[0-9]{1,2}:[0-9]{2}$", "description": "每天出發時間（plan_drive.py 算到住處的時間）"},
+        "pickup_time": {"type": "string", "pattern": "^[0-9]{1,2}:[0-9]{2}$", "description": "取車時間"},
+        "arrive_by": {"type": "string", "pattern": "^[0-9]{1,2}:[0-9]{2}$", "description": "最晚幾點到住處，晚於它 plan_drive.py 標出"},
+        "straight": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["express", "local", "express_km"],
+          "description": "沒有路網時的直線估算：[繞路係數, 時速]；直線距離 express_km 以上當高速公路",
+          "properties": {
+            "express": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}], "minItems": 2, "maxItems": 2},
+            "local": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}], "minItems": 2, "maxItems": 2},
+            "express_km": {"type": "number"}
+          }
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["speed", "link"],
+          "description": "路網（roads.txt）各級道路的平均時速 km/h：高速、國道、主要地方道、縣道、市町村道、生活道路；link 是匝道",
+          "properties": {
+            "speed": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0}, "minItems": 6, "maxItems": 6},
+            "link": {"type": "number", "exclusiveMinimum": 0}
+          }
+        },
+        "closed_roads": {
+          "type": "array",
+          "description": "旅行期間封閉、路網不收的路（roads.py）：OSM 標籤和值，範圍是 [南, 西, 北, 東]，只拿掉範圍內的部分；沒寫範圍＝整條",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tag", "value"],
+            "properties": {
+              "tag": {"enum": ["name", "ref"]},
+              "value": {"type": "string", "minLength": 1},
+              "bbox": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+              "note": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "basemap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wide", "fine"],
+      "description": "底圖（basemap_tiles.py 畫成 map/base/）：圖磚範圍 [基準縮放, x 起, x 迄, y 起, y 迄]，外圍拉遠看全程，細緻是景點所在的地區；和引擎固定用的 OpenStreetMap、山影以外的資料出處",
+      "properties": {
+        "wide": {"type": "array", "items": {"type": "integer"}, "minItems": 5, "maxItems": 5},
+        "fine": {"type": "array", "items": {"type": "integer"}, "minItems": 5, "maxItems": 5},
+        "wide_zooms": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "[最小, 最大]，沒寫＝[4, 7]"},
+        "fine_zooms": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "[最小, 最大]，沒寫＝[8, 10]"},
+        "credits": {
+          "type": "array",
+          "description": "其他資料的出處（鐵路、行政區界…），列在頁尾和地圖的 © 說明",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["what", "source"],
+            "properties": {
+              "what": {"type": "string", "minLength": 1, "description": "哪一層，例如「鐵路」"},
+              "source": {"type": "string", "minLength": 1, "description": "出處和加工說明"},
+              "url": {"type": "string", "pattern": "^https?://"}
+            }
+          }
+        }
+      }
+    },
+    "texts": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "覆寫頁面上的說明文字",
+      "properties": {
+        "drive_note": {"type": "string", "minLength": 1, "description": "頁尾第一段：開車時數怎麼估"},
+        "lodging_note": {"type": "string", "minLength": 1, "description": "住宿清單開頭的說明（後面接引擎固定的操作說明）"},
+        "region_word": {"type": "string", "minLength": 1, "description": "一級行政區的叫法，例如「縣」「州」；用在「全部縣收合」，沒寫＝「地區」"}
+      }
+    }
+  }
+}

@@ -33,9 +33,13 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 舊引擎的資料都在 `data/` 底下，是因為引擎和資料放在同一個 repo；資料 repo 只有資料，所以不用這一層。
 
+資料格式與欄位的維護方式見 [資料規範](data-spec.md)。套件從 `importlib.resources` 讀取 schema、範本和地圖資源。資料與產物一律用 UTF-8，產生檔統一使用 LF，讓 Windows 和 Linux 的結果可以直接比對。
+
 ## 3. 指令
 
 找資料 repo：`--root`，沒給就從目前目錄往上找 `seasoningway.toml`。
+
+地圖的輸入與測試見 [tripmap.md](tripmap.md)。
 
 | 指令 | 做什麼 | 取代舊引擎的 |
 |---|---|---|
@@ -99,6 +103,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 ## 7. 版本
 
 - 引擎用 semver。`0.x` 期間資料格式可以變，但每次變都要有 `migrate`。
+- 資料格式另用 `format` 記版本。改紀錄 schema 或旅程 README 的欄位時，更新 `config.FORMAT`、在 `project.MIGRATIONS` 新增從前一版升級的步驟，並用虛構資料測試。`migrate` 支援從第 3 版起升級。
 - 資料 repo 的 `seasoningway.toml` 寫 `engine = "X.Y.Z"`。`upgrade` 一起改這個版本、CI 的 `uses:` 版本，並重寫轉接檔。
 - 安裝的引擎和 `engine` 的 major.minor 不同時：`status` 提醒，`save` 拒絕保存，避免用錯的格式寫資料。
 

@@ -17,4 +17,10 @@ jobs:
         with:
           python-version: "3.13"  # 只測最低支援版本
       - run: pip install -e .
+      - run: npm install -g playwright@1 leaflet@1.9.4 && echo "NODE_PATH=$(npm root -g)" >> "$GITHUB_ENV"
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
       - run: python3 -m unittest discover -s tests
+        env:
+          SEASONINGWAY_BROWSER_TEST: require
+      - run: seasoningway --root tests/fixtures/demo check

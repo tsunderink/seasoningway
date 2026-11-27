@@ -19,3 +19,7 @@ version = { attr = "seasoningway.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+seasoningway = ["schemas/*.json", "templates/**/*", "templates/project/.gitattributes"]
+"seasoningway.tripmap" = ["*.html", "*.css", "*.js", "*.mjs"]

@@ -1,0 +1,81 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<!-- basemap_tiles.py 用的產圖頁：在無頭瀏覽器裡用 MapLibre 畫底圖，配色和要畫哪些圖層都在這裡改。不是地圖頁本身。 -->
+<link rel="stylesheet" href="/node_modules/maplibre-gl/dist/maplibre-gl.css">
+<style>html,body{margin:0;background:#fff}#map{position:absolute;left:0;top:0}</style></head><body><div id="map"></div>
+<script src="/node_modules/maplibre-gl/dist/maplibre-gl.js"></script>
+<script src="/node_modules/@protomaps/basemaps/dist/basemaps.js"></script>
+<script>
+const O = location.origin;
+// 配色：陸地、海、文字沿用地圖頁原本的顏色；高速公路橘、國道淺黃（參考 Google 地圖），鐵路灰。海的顏色要和 template.html 的 --sea 一樣（全是海的圖磚不存檔，直接露出地圖背景）
+const PAL = {
+  light: { flavor: "light", bg: "#d3e1eb", earth: "#f5f3ee", wood: "#e6ecdc", park: "#e1ead8", farm: "#f2f1e8", urban: "#ebe8e2", water: "#d3e1eb",
+    hwCase: "#d29a4e", hw: "#f4c57a", majCase: "#d9c48c", maj: "#fdf3cf", sec: "#ffffff", secCase: "#dcd6cb",
+    rail: "#8d96a3", shin: "#6f7c8e", label: "#3b4048", halo: "#ffffff", town: "#5d636b", waterLabel: "#6b8aa3", shield: "#7a6f62",
+    shadow: "#7a7362", highlight: "#ffffff", accent: "#9a917e", shOp: 0.3 },
+  dark: { flavor: "dark", bg: "#0e1b25", earth: "#1e2833", wood: "#1d2a2e", park: "#1d2a2e", farm: "#212b35", urban: "#262f39", water: "#0e1b25",
+    hwCase: "#4a3a24", hw: "#a07a45", majCase: "#2b333c", maj: "#6b6656", sec: "#3c4652", secCase: "#262e37",
+    rail: "#6d7887", shin: "#8d99a9", label: "#d3dae2", halo: "#0f141a", town: "#aab4bf", waterLabel: "#5f7d95", shield: "#aab4bf",
+    shadow: "#000000", highlight: "#53606e", accent: "#0a0f14", shOp: 0.35 },
+};
+const zi = (...p) => ["interpolate", ["linear"], ["zoom"], ...p];
+function buildStyle(theme) {
+  const P = PAL[theme], b = basemaps;
+  const fl = Object.assign({}, b.namedFlavor(P.flavor), { background: P.bg, earth: P.earth, water: P.water, city_label: P.label, city_label_halo: P.halo,
+    subplace_label: P.town, subplace_label_halo: P.halo, ocean_label: P.waterLabel, wood_a: P.wood, wood_b: P.wood, park_a: P.park, park_b: P.park,
+    scrub_a: P.wood, scrub_b: P.wood, glacier: P.earth, sand: P.farm, beach: P.farm, aerodrome: P.urban, industrial: P.urban, hospital: P.urban, school: P.urban, zoo: P.park, pedestrian: P.urban });
+  let L = b.layers("protomaps", fl, { lang: "ja" });
+  const drop = id => /^roads_|^boundaries|^places_(region|country|subplace)|^pois|^address|^water_waterway|^landuse_(runway|pier|pedestrian)|^buildings|^water_stream/.test(id);
+  L = L.filter(l => !drop(l.id));
+  // 圖磚裡不畫任何文字：地名由地圖頁另外畫（base/places.json），字才不會隨縮放忽大忽小
+  L = L.filter(l => l.type !== "symbol");
+  const lc = L.find(l => l.id === "landcover");
+  if (lc) lc.paint["fill-color"] = ["match", ["get", "kind"], "urban_area", P.urban, "farmland", P.farm, "grassland", P.farm, "barren", P.farm, "glacier", P.earth, P.wood];
+  const src = "protomaps", R = "roads";
+  const notT = ["!has", "is_tunnel"], isT = ["has", "is_tunnel"];
+  const hw = ["==", "kind", "highway"], maj = ["in", "kind_detail", "trunk", "primary"], sec = ["in", "kind_detail", "secondary"];
+  const majF = ["all", ["==", "kind", "major_road"], maj], secF = ["all", ["==", "kind", "major_road"], sec];
+  const line = (id, filter, color, width, extra) => Object.assign({ id, type: "line", source: src, "source-layer": R, filter,
+    layout: { "line-join": "round", "line-cap": "round" }, paint: Object.assign({ "line-color": color, "line-width": width }, extra || {}) });
+  const rail = (id, kind, color, width, dash, minzoom) => ({ id, type: "line", source: "rail", filter: ["==", "kind", kind], minzoom,
+    paint: { "line-color": color, "line-width": width, "line-dasharray": dash } });
+  const roads = [
+    line("sec_case", ["all", secF, notT], P.secCase, zi(7, 0, 8, 1.6, 9, 2.4), { "line-opacity": zi(7, 0, 7.5, 1) }),
+    line("sec", ["all", secF], P.sec, zi(7, 0, 8, 0.8, 9, 1.3), { "line-opacity": zi(7, 0, 7.5, 1) }),
+    line("maj_case", ["all", majF, notT], P.majCase, zi(5, 0, 6, 1.0, 7, 1.6, 8, 2.6, 9, 3.4)),
+    line("maj", ["all", majF], P.maj, zi(5, 0, 6, 0.5, 7, 0.9, 8, 1.5, 9, 2.0)),
+    rail("rail_other", "other", P.rail, zi(6, 0.4, 9, 0.9), [3, 2], 6.5),
+    rail("rail_jr", "jr", P.rail, zi(5, 0.5, 9, 1.1), [1], 5),
+    rail("rail_shin", "shinkansen", P.shin, zi(4, 0.7, 9, 1.6), [1], 3),
+    line("hw_case_t", ["all", hw, isT], P.hwCase, zi(3, 0.4, 6, 1.6, 8, 3.0, 9, 3.8), { "line-opacity": 0.4 }),
+    line("hw_t", ["all", hw, isT], P.hw, zi(3, 0, 5, 0.6, 6, 0.9, 8, 1.8, 9, 2.3), { "line-opacity": 0.5 }),
+    line("hw_case", ["all", hw, notT], P.hwCase, zi(3, 0.4, 6, 1.6, 8, 3.0, 9, 3.8)),
+    line("hw", ["all", hw, notT], P.hw, zi(3, 0, 5, 0.6, 6, 0.9, 8, 1.8, 9, 2.3)),
+  ];
+  const hill = { id: "hillshade", type: "hillshade", source: "dem", paint: { "hillshade-shadow-color": P.shadow, "hillshade-highlight-color": P.highlight,
+    "hillshade-accent-color": P.accent, "hillshade-exaggeration": P.shOp, "hillshade-illumination-direction": 315 } };
+  const iw = L.findIndex(l => l.id === "water");
+  L.splice(iw, 0, hill);
+  const ip = L.findIndex(l => l.type === "symbol");
+  L.splice(ip, 0, ...roads);
+  return { version: 8, glyphs: O + "/fonts/{fontstack}/{range}.pbf", sprite: O + "/sprites/v4/" + P.flavor,
+    sources: { protomaps: { type: "vector", tiles: [O + "/vt/{z}/{x}/{y}.mvt"], maxzoom: 15 },
+      dem: { type: "raster-dem", tiles: [O + "/dem/{z}/{x}/{y}.png"], encoding: "terrarium", tileSize: 256, maxzoom: 12 },
+      rail: { type: "geojson", data: O + "/rail.geojson" } },
+    layers: L };
+}
+let map = null, theme = null;
+window.setup = (th, w, h) => new Promise(res => {
+  const el = document.getElementById("map"); el.style.width = w + "px"; el.style.height = h + "px";
+  if (map && theme === th) { map.resize(); return res(); }
+  if (map) map.remove();
+  theme = th;
+  map = new maplibregl.Map({ container: "map", style: buildStyle(th), center: [140, 38], zoom: 8, interactive: false, attributionControl: false,
+    fadeDuration: 0, localIdeographFontFamily: "'Noto Sans CJK JP', 'Noto Sans JP', sans-serif", canvasContextAttributes: { preserveDrawingBuffer: true }, maxTileCacheSize: 400 });
+  map.once("idle", () => res());
+});
+window.shot = (lon, lat, zoom) => new Promise(res => {
+  map.jumpTo({ center: [lon, lat], zoom });
+  const done = () => { if (map.loaded() && map.areTilesLoaded()) { requestAnimationFrame(() => requestAnimationFrame(() => res(true))); } else setTimeout(done, 100); };
+  map.once("idle", done);
+});
+</script></body></html>

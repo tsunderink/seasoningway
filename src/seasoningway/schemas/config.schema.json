@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "seasoningway.toml",
+  "description": "這個 repo 的設定；欄位說明也在 templates/project/seasoningway.toml。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["engine", "format"],
+  "properties": {
+    "engine": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "description": "資料 repo 使用的 seasoningway 版本（X.Y.Z）"
+    },
+    "format": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "資料格式版本，由 seasoningway migrate 更新"
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["main", "branch", "local"],
+          "description": "回合結束前怎麼保存：main 直接 push 到 origin/main；branch push 到目前分支的 upstream；local 只 commit"
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_currency": {
+          "anyOf": [{"$ref": "common.schema.json#/$defs/currency"}, {"const": ""}],
+          "description": "新旅程預算的基準幣別"
+        }
+      }
+    },
+    "people": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "同行者的角色代稱（不寫名字）；旅程 README「下一步」開頭可以寫的人"
+        }
+      }
+    },
+    "publish": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "enum": ["artifact", "none"],
+          "description": "artifact：網頁發布成 claude.ai artifact，check 提醒沒重新發布的改動；none：不提醒"
+        }
+      }
+    }
+  }
+}

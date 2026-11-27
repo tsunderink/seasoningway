@@ -15,23 +15,25 @@
 
 完成時：`check`、`new`、`budget`、`published`、`migrate` 可以在新目錄的資料 repo 上跑，舊的測試全部搬過來並通過。
 
-- [ ] `core/trips.py` 搬進 `src/seasoningway/`。拆成幾個模組（例如 `config`、`records`、`checks`、`budget`、`views`、`pii`、`gitops`），一個模組一個主題，不必一次拆到最細。
-- [ ] 引擎的檔案用 `importlib.resources` 讀，並寫進 `pyproject.toml` 的 package data。
-- [ ] 改用新目錄（design.md 第 2 節）：往上找 `seasoningway.toml`，路徑從 `data/trips/` 改成 `trips/`，`data/profile/` 改成 `profile/`，`data/trips.toml` 改成 `seasoningway.toml`。設定 schema 加上 `engine` 欄位。
-- [ ] `core/schemas/` 搬到 `src/seasoningway/schemas/`。
-- [ ] `core/templates/` 搬到 `src/seasoningway/templates/`，改用新目錄。
-- [ ] `core/tripmap/` 搬到 `src/seasoningway/tripmap/`，包括 `template.html`、Leaflet 的 CSS、`test_page.js`。
-- [ ] `core/examples/demo` 改成新目錄後放到 `tests/fixtures/demo/`。
-- [ ] `core/test_trips.py`、`core/tripmap/test_tripmap.py` 搬到 `tests/`。拿掉只和模板 repo 有關的測試（例如檢查引擎、資料分界和 commit 訊息的部分）。
-- [ ] CI 加上地圖頁的瀏覽器測試，做法照舊的 `.github/workflows/check.yml`。
-- [ ] 不搬：`is_engine`、`COMMIT_SCOPES`、`commit-msg`、`commits`（design.md 第 8 節）。
-- [ ] `core/docs/data-spec.md` 搬到 `docs/data-spec.md`，`core/docs/roadmap.md` 第 2、3 節（地圖頁的通用化）搬到 `docs/roadmap.md`，路徑都改成新的。`architecture.md` 不搬，仍然適用的內容合併進 design.md。
+過渡安排（第 2 階段拿掉）：`migrate` 兼做空目錄的初始化；沿用 `build` 產生視圖、`check` 比對產物是否最新；總覽寫到 `trip-index.md`；`data-spec.md`、`tripmap.md` 標「第 1 階段」的段落描述這個狀態。
+
+- [x] `core/trips.py` 搬進 `src/seasoningway/`，依設定、紀錄、驗證、預算、視圖、個資與 Git 等主題拆開。
+- [x] 引擎的檔案用 `importlib.resources` 讀，並寫進 `pyproject.toml` 的 package data。
+- [x] 改用新目錄（design.md 第 2 節）：往上找 `seasoningway.toml`，路徑從 `data/trips/` 改成 `trips/`，`data/profile/` 改成 `profile/`，`data/trips.toml` 改成 `seasoningway.toml`。設定 schema 加上 `engine` 欄位。
+- [x] `core/schemas/` 搬到 `src/seasoningway/schemas/`。
+- [x] `core/templates/` 搬到 `src/seasoningway/templates/`，改用新目錄。
+- [x] `core/tripmap/` 搬到 `src/seasoningway/tripmap/`，包括 `template.html`、Leaflet 的 CSS、`test_page.js`。
+- [x] `core/examples/demo` 改成新目錄後放到 `tests/fixtures/demo/`。
+- [x] `core/test_trips.py`、`core/tripmap/test_tripmap.py` 搬到 `tests/`，移除舊模板的引擎與資料分界、commit 訊息和轉接檔測試。
+- [x] CI 加上地圖頁的瀏覽器測試，沿用桌面與手機煙霧測試，測試使用本機的 Leaflet 1.9.4。
+- [x] 不搬：`is_engine`、`COMMIT_SCOPES`、`commit-msg`、`commits`（design.md 第 8 節）。
+- [x] 資料規範、地圖通用化待辦與地圖介面規格分別移入 `docs/data-spec.md`、`docs/roadmap.md` 和 `docs/tripmap.md`，仍適用的架構規則併入 `design.md`。
 
 ## 第 2 階段：新的指令
 
 完成時：design.md 第 3、4 節的 `status`、`render`、`save`、`fetch` 照規格運作，每種失敗情況都有測試。
 
-- [ ] `render`：先驗證，通過才產生到 `out/<旅程>/`，不通過就不產出。拿掉「產物是不是最新的」檢查。
+- [ ] `render`：先驗證，通過才產生到 `out/<旅程>/`，不通過就不產出。拿掉第 1 階段的過渡安排（見上），包括 `build` 指令、產物比對、`.gitattributes` 的產物標記，以及文件裡標「第 1 階段」的段落。
 - [ ] `fetch`：把 `plan_drive`、`roads`、`basemap_tiles`、`place_ids` 包成 `fetch <旅程> <種類>`，寫進 `trips/<旅程>/cache/`。
 - [ ] 舊的 `map/roads.txt`、`map/base/places.json`、`map/base/tiles.json` 改成 `cache/` 裡的資料，`render` 從那裡讀。
 - [ ] `published.json` 改記來源和快取的雜湊。

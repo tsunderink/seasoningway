@@ -4,7 +4,7 @@
 
 旅程資料放在你自己的私人 repo（資料 repo），由任何會讀檔、會跑指令的 AI agent（Claude Code、Codex 或其他）規劃。seasoningway 負責驗證資料、產生頁面、保存到 git，讓不同的 agent 交出同樣工整的成果。
 
-> **狀態：骨架。** 指令介面已經定案，實作正從舊引擎搬過來，進度見 [docs/migration.md](docs/migration.md)。
+> `check`、`new`、`budget`、`published`、`migrate` 已支援新版資料目錄。其他指令的進度見 [遷移清單](docs/migration.md)。
 
 ## 安裝
 

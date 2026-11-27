@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "旅程 README 開頭的設定",
+  "description": "trips/<旅程>/README.md 開頭 --- 之間的 key: value。值都當文字讀，留白的欄位當作沒寫。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "status", "travelers", "currency"],
+  "properties": {
+    "title": {"type": "string", "minLength": 1},
+    "status": {"enum": ["構想", "規劃中", "已訂妥", "旅行中", "已結束"]},
+    "start": {"$ref": "common.schema.json#/$defs/date"},
+    "end": {"$ref": "common.schema.json#/$defs/date"},
+    "travelers": {"type": "string", "pattern": "^[1-9][0-9]*$", "description": "人數，正整數"},
+    "currency": {"$ref": "common.schema.json#/$defs/currency", "description": "預算的基準幣別"},
+    "show_also": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}([,，、 ]+[A-Z]{3})*$",
+      "description": "budget.md 另外並列的幣別，要在 budget.json 的 rates 有匯率"
+    },
+    "budget_target": {
+      "type": "string",
+      "pattern": "^[0-9][0-9,]*(\\.[0-9]+)?$",
+      "description": "全體合計的預算目標（基準幣別）"
+    }
+  }
+}
