@@ -1,0 +1,47 @@
+name: release v0.1.0
+on:
+  workflow_run:
+    workflows: [ci]
+    branches: [main]
+    types: [completed]
+concurrency: release-v0.1.0
+jobs:
+  release:
+    if: >-
+      github.repository == 'tsunderink/seasoningway' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: 發布通過 main CI 的 v0.1.0
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=v0.1.0
+          grep -Fxq '__version__ = "0.1.0"' src/seasoningway/__init__.py || exit 0
+          if draft=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$draft" = true ]; then
+              echo "$tag 已有 Release 草稿，請核對草稿指向的 commit" >&2
+              exit 1
+            fi
+            echo "$tag 已發布"
+            exit 0
+          fi
+          sha=$(git rev-parse HEAD)
+          if existing=$(git ls-remote --exit-code --tags origin "refs/tags/$tag"); then
+            test "$(cut -f1 <<< "$existing")" = "$sha"
+          else
+            test "$?" -eq 2
+          fi
+          gh release create "$tag" --target "$sha" --title "$tag" \
+            --notes '第一個資料 repo 版本。支援舊模板資料遷移、頁面產生、Git 保存、Claude Code 和 Codex 轉接。'

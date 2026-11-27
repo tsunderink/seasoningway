@@ -1,0 +1,9 @@
+{
+  "slug": "example-city",
+  "version": "v1",
+  "include": [
+    "index.html",
+    "roads.txt"
+  ],
+  "files": {}
+}

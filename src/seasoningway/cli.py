@@ -14,6 +14,7 @@ from .config import FORMAT, find_root, load_config
 from .fetch import cmd_fetch, configure_fetch
 from .guides import TOPICS, cmd_guide
 from .hooks import cmd_hook
+from .legacy import cmd_from_template, find_template
 from .project import cmd_migrate, cmd_new
 from .published import cmd_published
 from .render import cmd_render
@@ -72,6 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
         elif name == "save":
             p.add_argument("--check", action="store_true", help="檢查驗證、工作區和推送狀態")
             p.add_argument("-m", "--message", help="附在自動產生的 commit 訊息後")
+        elif name == "migrate":
+            p.add_argument("--from-template", action="store_true", help="從舊模板 repo 搬出 data/ 並初始化")
         elif name == "fetch":
             configure_fetch(p)
         elif name == "guide":
@@ -102,6 +105,11 @@ def main(argv: list[str] | None = None, *, root: Path | None = None, today: date
             root = Path(ns.root).resolve()
         if ns.command in ("guide", "hook"):
             return handler(ns, root.resolve() if root is not None else None, today or date.today())
+        if ns.command == "migrate" and ns.from_template:
+            root = root or find_template(Path.cwd()) or find_root(Path.cwd())
+            if root is None:
+                raise Problem("找不到舊模板 repo 的 data/trips.toml")
+            return cmd_from_template(ns, root.resolve(), today or date.today())
         if root is None:
             root = Path.cwd() if ns.command == "init" else find_root(Path.cwd())
         if root is None:

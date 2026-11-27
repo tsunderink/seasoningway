@@ -1,0 +1,8 @@
+# 產生的檔案：不手動改，改來源再 build。GitHub 的 diff 會收合；trips.py check 掃個資時跳過。
+# 旅程自己的產生檔寫在旅程資料夾的 .gitattributes。
+/data/README.md linguist-generated
+data/trips/*/budget.md linguist-generated
+data/trips/*/**/published.json linguist-generated
+data/trips/*/bookings.md linguist-generated
+data/trips/*/itinerary.md linguist-generated
+*.example text

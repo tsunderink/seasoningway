@@ -65,6 +65,14 @@ def bootstrap_paths(root: Path, paths: set[str]) -> set[str]:
             and (root / p).read_text(encoding="utf-8") == expected[p]}
 
 
+def relocated_paths(root: Path) -> set[str]:
+    """遷移後首次保存可帶上舊 data/ 裡已追蹤、搬到根目錄的其他檔案。"""
+    if (root / "data").exists() or run_git(root, "cat-file", "-e", "HEAD:data/trips.toml").returncode:
+        return set()
+    old = names(checked_git(root, "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", "data"))
+    return {path.removeprefix("data/") for path in old}
+
+
 def new_paths(root: Path) -> set[str]:
     untracked = names(checked_git(root, "ls-files", "-z", "--others", "--exclude-standard"))
     added = names(checked_git(root, "diff", "--cached", "--name-only", "--no-renames", "--diff-filter=A", "-z"))
@@ -75,9 +83,11 @@ def check_paths(root: Path) -> set[str]:
     if checked_git(root, "ls-files", "-z", "--", OUT):
         raise Problem(f"{OUT}/ 有已追蹤的產物：請先從 Git 索引移除並保留本地檔案")
     paths = new_paths(root)
-    outside = sorted({path for path in paths if not data_path(path)} - bootstrap_paths(root, paths))
+    outside = {path for path in paths if not data_path(path)} - bootstrap_paths(root, paths)
     if outside:
-        raise Problem("資料路徑外有新檔，請移到資料路徑內或加到 .gitignore：\n" + "\n".join(outside))
+        outside -= relocated_paths(root)
+    if outside:
+        raise Problem("資料路徑外有新檔，請移到資料路徑內或加到 .gitignore：\n" + "\n".join(sorted(outside)))
     return paths
 
 

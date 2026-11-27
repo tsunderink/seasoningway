@@ -1,0 +1,66 @@
+{
+  "title": "範例市冬遊地圖",
+  "short_title": "範例市",
+  "storage_prefix": "example",
+  "home": "old-town",
+  "categories": [
+    {
+      "id": "sight",
+      "glyph": "景",
+      "name": "景點"
+    }
+  ],
+  "season": {
+    "label": "冬季",
+    "tiers": {
+      "1": "第 1 級",
+      "2": "第 2 級",
+      "3": "第 3 級",
+      "4": "第 4 級",
+      "5": "第 5 級"
+    }
+  },
+  "drive": {
+    "max_hours": 4
+  },
+  "view": {
+    "lat": 30.02,
+    "lon": 140.02,
+    "zoom": 7
+  },
+  "ratings": [
+    {
+      "site": "example-site",
+      "name": "範例評分"
+    }
+  ],
+  "preset": {
+    "2099-01-16": [
+      "example-temple",
+      "riverside-path"
+    ]
+  },
+  "basemap": {
+    "wide": [
+      7,
+      112,
+      115,
+      51,
+      55
+    ],
+    "fine": [
+      8,
+      225,
+      230,
+      104,
+      109
+    ],
+    "credits": [
+      {
+        "what": "地圖",
+        "source": "虛構測試資料",
+        "url": "https://example.com/map"
+      }
+    ]
+  }
+}

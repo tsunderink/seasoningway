@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "zh": "範例縣",
+        "focus": true
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                140.0,
+                30.0
+              ],
+              [
+                140.125,
+                30.0
+              ],
+              [
+                140.125,
+                30.125
+              ],
+              [
+                140.0,
+                30.125
+              ],
+              [
+                140.0,
+                30.0
+              ]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

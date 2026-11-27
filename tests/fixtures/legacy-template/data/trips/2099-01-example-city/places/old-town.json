@@ -1,0 +1,38 @@
+{
+  "id": "old-town",
+  "name": "老街",
+  "region": "範例縣",
+  "location": {
+    "lat": 30.01,
+    "lon": 140.01,
+    "approximate": true
+  },
+  "categories": [
+    "sight"
+  ],
+  "summary": "車站北邊的石板路老街，1 月有冬季燈會，晚上人多",
+  "season": {
+    "tier": 4,
+    "why": "燈會期間晚上點燈，白天早上 8 點前人少"
+  },
+  "facts": [
+    {
+      "label": "門票",
+      "value": "免費"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://example.com/old-town",
+      "title": "範例來源"
+    }
+  ],
+  "visit": {
+    "min": 120,
+    "max": 180,
+    "note": "沒有找到公開的建議時間，Claude 依步行範圍估",
+    "sources": [],
+    "as_of": "2098-11-10"
+  },
+  "as_of": "2098-11-10"
+}

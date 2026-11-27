@@ -49,7 +49,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 | `save [-m 說明]` | 見下 | 回合結束前的手動流程、`finish` |
 | `save --check` | 不改任何東西，回報沒通過的驗證、沒保存的改動、沒 push 的 commit | `finish` |
 | `fetch <旅程> <種類>` | 抓要連網的資料（路線、底圖、地點 ID）寫進 `cache/` | `core/tripmap/` 的各個腳本 |
-| `new`、`migrate` | 在資料 repo 建立旅程、升級既有資料 | 同名指令 |
+| `new`、`migrate [--from-template]` | 建立旅程、升級既有資料；2026-11-27 起可從舊模板搬到新目錄 | 同名指令 |
 | `budget <旅程>` | 計算並印出預算合計，預算頁由 `render` 產生 | `budget` |
 | `published <旅程> <版本>` | 發布後記錄來源和快取雜湊，第一次加 `--slug` | `published` |
 | `guide <主題>` | 印出流程說明（規劃、蒐集景點、重查、檢查頁面、定案、檢討） | `.agents/skills/` |

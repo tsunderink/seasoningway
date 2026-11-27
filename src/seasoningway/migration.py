@@ -1,7 +1,9 @@
 """把第 3 版資料升級到第 4 版。"""
 import json
+import posixpath
 import re
 from pathlib import Path
+from urllib.parse import unquote
 
 from .common import Problem, TRIPS
 from .files import write_text
@@ -11,6 +13,7 @@ from .records import dump_json, parse_json, record_kind, record_paths, schema_ur
 CACHE_FILES = ("roads.txt", "roads.json", "place_ids.json", "base")
 VIEWS = ("budget.md", "bookings.md", "itinerary.md")
 GENERATED_START = "<!-- 由 seasoningway 產生"
+LEGACY_GENERATED_START = "<!-- 由 core/trips.py 產生，請勿手動編輯。"
 OLD_ATTRIBUTES = ("trips/*/budget.md", "trips/*/bookings.md", "trips/*/itinerary.md",
                   "trips/*/map/index.html", "trips/*/**/published.json", "/trip-index.md")
 
@@ -38,6 +41,23 @@ def add_schema(path: Path, rel: str) -> str | None:
     # 保留原始數字、欄位順序和其他內容。
     marker = '\n  "$schema": ' + json.dumps(url) + ("," if data else "")
     return re.sub(r"\{", lambda _: "{" + marker + ("\n" if "\n" not in text[1:] else ""), text, count=1)
+
+
+def generated_markdown(text: str) -> bool:
+    return text.startswith((GENERATED_START, LEGACY_GENERATED_START))
+
+
+def update_view_links(text: str, parent: str, converted: dict[str, str]) -> str:
+    def replace(match: re.Match) -> str:
+        label, target, fragment = match.groups()
+        path = posixpath.normpath(posixpath.join(parent, unquote(target)))
+        if path not in converted:
+            return match[0]
+        name = posixpath.basename(target)
+        source = posixpath.basename(converted[path])
+        return f"[{source if label == name else label}]({target.removesuffix(name)}{source}{fragment or ''})"
+
+    return re.sub(r"(?<!!)\[([^]\n]+)\]\(([^()#\s]+\.(?:md|html))(#[^()\s]*)?\)", replace, text)
 
 
 def upgrade_v4(root: Path) -> list[str]:
@@ -68,31 +88,27 @@ def upgrade_v4(root: Path) -> list[str]:
                 if target.exists() or target.is_symlink():
                     raise Problem(f"{target.relative_to(root).as_posix()} 已存在：整合兩份快取後再執行 migrate")
                 moves.append((source, target))
-        converted_views = []
+        converted_views = {}
         for name in VIEWS:
             view = trip / name
-            if not view.exists():
-                converted_views.append(name)
-            elif view.is_file() and view.read_text(encoding="utf-8").startswith(GENERATED_START):
-                converted_views.append(name)
+            if view.is_file() and generated_markdown(view.read_text(encoding="utf-8")):
                 delete.append(view)
+            if not view.exists() or view in delete:
+                converted_views[name] = Path(name).stem + ".json"
         page = trip / "map/index.html"
         if page.is_file():
             text = page.read_text(encoding="utf-8")
             if "const BASE =" in text and "const DATA =" in text and "id=\"view-days\"" in text:
                 delete.append(page)
+        if (trip / "map/config.json").is_file() and (page in delete or not page.exists()):
+            converted_views["map/index.html"] = "map/config.json"
         for path in trip.rglob("*.md"):
             if path in delete:
                 continue
             text = path.read_text(encoding="utf-8")
-            new = text.replace("seasoningway build", "seasoningway render")
-            for name in converted_views:
-                record = f"{Path(name).stem}.json"
-                prefix = "" if path.parent == trip else "../" if path.parent.parent == trip else None
-                if prefix is None:
-                    continue
-                new = new.replace(f"[{name}]({prefix}{name})", f"[{record}]({prefix}{record})")  # 檔名當連結文字的一起改
-                new = new.replace(f"]({prefix}{name})", f"]({prefix}{record})")
+            new = text.replace("python3 core/trips.py build", "seasoningway render")
+            new = update_view_links(new.replace("seasoningway build", "seasoningway render"),
+                                    path.parent.relative_to(trip).as_posix(), converted_views)
             if new != text:
                 updates[path] = new
     changed = []
@@ -104,7 +120,7 @@ def upgrade_v4(root: Path) -> list[str]:
         source.rename(target)
         changed.append(target.relative_to(root).as_posix())
     for path in delete:
-        if path.is_file() and (path.suffix == ".html" or path.read_text(encoding="utf-8").startswith(GENERATED_START)):
+        if path.is_file() and (path.suffix == ".html" or generated_markdown(path.read_text(encoding="utf-8"))):
             path.unlink()
             changed.append(path.relative_to(root).as_posix())
     attrs = root / ".gitattributes"

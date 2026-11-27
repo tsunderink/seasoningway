@@ -1,4 +1,6 @@
 """安全更新產物與快取。"""
+from collections.abc import Iterable
+from itertools import chain
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -19,11 +21,11 @@ def write_text(path: Path, text: str) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def replace_paths(stage: Path, updates: dict[Path, Path]) -> None:
-    """以已準備好的檔案或目錄更新目標，失敗時還原已更新的目標。"""
+def replace_paths(stage: Path, updates: dict[Path, Path], *, remove: Iterable[Path] = ()) -> None:
+    """更新已準備好的路徑並移除舊路徑，失敗時還原。"""
     moved = []
     try:
-        for index, (source, target) in enumerate(updates.items()):
+        for index, (source, target) in enumerate(chain(updates.items(), ((None, item) for item in remove))):
             backup = stage / f"previous-{index}"
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.exists() or target.is_symlink():
@@ -31,10 +33,11 @@ def replace_paths(stage: Path, updates: dict[Path, Path]) -> None:
             else:
                 backup = None
             moved.append((source, target, backup))
-            source.replace(target)
+            if source is not None:
+                source.replace(target)
     except OSError:
         for source, target, backup in reversed(moved):
-            if not source.exists():
+            if source is not None and not source.exists():
                 target.replace(source)
             if backup is not None:
                 backup.replace(target)
