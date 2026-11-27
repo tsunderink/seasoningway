@@ -1,6 +1,10 @@
 # {{generated}}
 name: check
-on: [push, pull_request]
+# 分支 push 不跑，只跑 PR 和 main，避免同一個 commit 跑兩次。
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 jobs:

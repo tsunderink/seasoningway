@@ -56,9 +56,16 @@
 
 完成時：舊的模板 repo 可以一個指令變成新的資料 repo，而且頁面和舊引擎產生的一樣。
 
-- [ ] `migrate --from-template`：`data/*` 搬到根目錄、`data/trips.toml` 改成 `seasoningway.toml` 並加上 `engine`、地圖快取搬進 `cache/`、刪掉舊的引擎檔案、執行 `init`。在一份舊目錄的 fixture 上測試。
-- [ ] 對照測試：同一份 demo 資料，舊引擎 `build` 產生的頁面和新引擎 `render` 產生的頁面相同。有差異要逐項說明理由。
-- [ ] 發布 `v0.1.0`。
+- [x] `migrate --from-template`：`data/*` 搬到根目錄、`data/trips.toml` 改成 `seasoningway.toml` 並加上 `engine`、地圖快取搬進 `cache/`、刪掉舊的引擎檔案、執行 `init`。用虛構的舊目錄 fixture 驗證。
+- [x] 對照測試：同一份 demo 以舊引擎 `build` 和新版 `render` 產生頁面，差異見下表。測試使用舊引擎的 Markdown 產物和地圖 SHA-256；有舊引擎時可設定 `SEASONINGWAY_LEGACY_CORE` 指向舊 `core/`，跑 `python3 -m unittest discover -s tests -p test_legacy.py` 當場重建舊頁面。
+- [ ] 發布 `v0.1.0`。Claude 合併後，`main` 的 CI 通過時，發布 workflow 會在該次測試的 commit 建立標籤與 Release。
+
+| 產物 | 差異 |
+|---|---|
+| 旅程總覽 | 檔頭改用 `seasoningway render`；旅程、偏好、心得及清單的連結改從 `out/` 指回來源。 |
+| 預算、預訂 | 檔頭改用 `seasoningway render`。表格、金額與預訂資訊逐行一致。 |
+| 逐日行程 | 檔頭改用 `seasoningway render`；住宿研究連結改從 `out/<旅程>/` 指回來源。 |
+| 地圖 HTML、道路快取 | 逐位元組一致。 |
 
 ## 第 5 階段：切換使用者的資料 repo（不由 Codex 做）
 

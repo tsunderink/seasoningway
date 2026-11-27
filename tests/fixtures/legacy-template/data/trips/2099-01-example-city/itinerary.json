@@ -1,0 +1,29 @@
+{
+  "summary": "草案：照 README「已決定」排，交通是官網時刻表的粗估。",
+  "days": [
+    {
+      "date": "2099-01-15",
+      "plan": "抵達範例市，車站寄放行李",
+      "stay": "範例飯店 A（[住宿候選](research/lodging.md)）"
+    },
+    {
+      "date": "2099-01-16",
+      "plan": "老街，晚上看燈會",
+      "stay": "範例飯店 A（[住宿候選](research/lodging.md)）",
+      "travel": "巴士約 50 分鐘",
+      "places": [
+        "old-town"
+      ]
+    },
+    {
+      "date": "2099-01-17",
+      "plan": "河堤步道（見本川の遊歩道）→ 範例寺（見本寺）",
+      "stay": "待決定（README「待決定」）",
+      "travel": "巴士約 40 分鐘",
+      "places": [
+        "riverside-path",
+        "example-temple"
+      ]
+    }
+  ]
+}

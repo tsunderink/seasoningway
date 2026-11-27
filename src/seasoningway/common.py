@@ -28,3 +28,6 @@ def real_date(text: str) -> date | None:
         return date.fromisoformat(text)
     except ValueError:
         return None
+
+# 引擎 repo 公開的文件。資料裡連過去的是引擎說明，不是研究來源。
+ENGINE_DOCS = "https://github.com/tsunderink/seasoningway/blob/main/docs/"

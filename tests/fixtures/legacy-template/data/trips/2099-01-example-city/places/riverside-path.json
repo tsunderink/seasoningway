@@ -1,0 +1,26 @@
+{
+  "id": "riverside-path",
+  "name": "河堤步道",
+  "local_name": "見本川の遊歩道",
+  "region": "範例縣",
+  "location": {
+    "lat": 30.03,
+    "lon": 140.03,
+    "approximate": true
+  },
+  "categories": [
+    "sight"
+  ],
+  "summary": "沿見本川的河堤步道，約 2 公里，冬天常積雪",
+  "season": {
+    "tier": 5,
+    "why": "1 月河面結冰，步道雪景"
+  },
+  "sources": [
+    {
+      "url": "research/lodging.md",
+      "title": "範例：也可以引用研究筆記"
+    }
+  ],
+  "as_of": "2098-11-10"
+}

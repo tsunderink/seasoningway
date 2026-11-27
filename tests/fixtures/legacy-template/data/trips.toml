@@ -1,0 +1,21 @@
+# 這個 repo 的設定，core/trips.py 和 hooks（core/hooks.py）都讀這裡。換一個使用者只改 data/。
+format = 3  # 資料格式版本，由 python3 core/trips.py migrate 更新
+
+[git]
+# 回合結束前怎麼保存改動（Claude Code 的 SessionStart、Stop hook 和 Codex 的開場步驟照這個做，AGENTS.md「改了檔案的回合結束前」）。
+# 還沒設定時照 local 做，check 會提醒規劃助理問你要哪一種：
+#   main    長期授權規劃助理（Claude、Codex）直接在 main commit、push 到 origin/main（雲端 session 建議用這個）
+#   branch  在目前的分支 commit、push 到它的 upstream
+#   local   只 commit，不 push（雲端 session 的容器回收時，沒 push 的改動會不見）
+mode = "local"
+
+[budget]
+default_currency = "TWD"  # 新旅程預算的基準幣別（三碼，例如 TWD）
+
+[people]
+# 旅程 README「下一步」開頭寫誰做：「使用者」「Claude」「Codex」一律可以用，同行者的角色代稱列在這裡
+roles = ["我", "伴侶"]
+
+[publish]
+# artifact：網頁發布成 claude.ai artifact，check 會提醒沒重新發布的改動；none：不發布、不提醒
+target = "artifact"

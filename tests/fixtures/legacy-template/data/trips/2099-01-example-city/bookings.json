@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "hotel-a",
+      "item": "第一、二晚住宿（範例飯店 A）",
+      "date": "2099-01-15",
+      "status": "待訂",
+      "when": "2098-11-20 前，燈會期間很快訂滿",
+      "book_on": "2098-11-20",
+      "platform": "[範例訂房網](https://example.com/booking)",
+      "note": "可免費取消到入住前 3 天"
+    }
+  ]
+}
