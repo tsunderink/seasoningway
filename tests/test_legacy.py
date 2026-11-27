@@ -130,7 +130,8 @@ class LegacyMigrationTest(DataRepoTest):
         preset = json.loads(re.search(r"^const DATA = (.*);$", page, re.MULTILINE).group(1))["trip"]["preset"]
         self.assertEqual(preset, {"2099-01-15": {}, "2099-01-16": {"ids": ["old-town"]},
                                   "2099-01-17": {"ids": ["riverside-path", "example-temple"]}})
-        self.assertEqual((map_dir / "roads.txt").read_bytes(), caches["roads.txt"])
+        road_data = json.loads(re.search(r"^const ROAD_DATA = (.*);$", page, re.MULTILINE).group(1))
+        self.assertEqual(road_data, caches["roads.txt"].decode("utf-8").strip())
 
         self.assertEqual(self.ok(self.git("config", "--local", "core.hooksPath")).strip(), ".githooks")
         self.ok(self.cli("save"))
