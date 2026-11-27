@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/place.schema.json",
   "id": "example-temple",
   "name": "範例寺",
   "local_name": "見本寺",

@@ -4,8 +4,9 @@
   "description": "一天一項，依日期排；營業時間、票價等事實放 research/，這裡用連結引用。產生 itinerary.md。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["days"],
+  "required": ["$schema", "days"],
   "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/itinerary.schema.json"},
     "summary": {
       "$ref": "common.schema.json#/$defs/text",
       "description": "表格上方：照哪一版的行程整理、交通時間怎麼估、是不是草案"

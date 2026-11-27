@@ -38,10 +38,16 @@ def schema_doc(file: str) -> dict:
 STALE_DAYS = schema_doc("common.schema.json")["$defs"]["as_of"]["x-freshness-days"]
 
 
+def schema_url(name: str) -> str:
+    return f"https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/{name}.schema.json"
+
+
 def record_kind(rel: str) -> str | None:
     """repo 裡的相對路徑 → 它的 schema 名稱；不是旅程紀錄檔就回傳 None。"""
     parts = rel.split("/")
-    if len(parts) == 3 and parts[0] == "trips":
+    if len(parts) >= 3 and parts[0] == TRIPS and parts[-1] == "published.json":
+        return "published"
+    if len(parts) == 3 and parts[0] == TRIPS:
         return RECORDS.get(parts[2])
     if len(parts) == 4 and parts[0] == "trips" and parts[3].endswith(".json"):
         return NESTED_RECORDS.get((parts[2], parts[3])) or NESTED_RECORDS.get((parts[2], None))
@@ -159,7 +165,8 @@ def record_problems(rel: str, text: str) -> list[str]:
         if name is None:
             return []
         data = parse_json(text, rel)
-        return schema_errors(name, data, rel) or RECORD_RULES[name](data, rel)
+        errors = schema_errors(name, data, rel)
+        return errors or (RECORD_RULES[name](data, rel) if name in RECORD_RULES else [])
     except Problem as e:
         return str(e).splitlines()
 

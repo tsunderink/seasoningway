@@ -5,11 +5,12 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import __version__
 from .common import CONFIG, Problem
 from .records import missing_dependency, record_problems
 
 
-FORMAT = 3  # 資料格式版本：改了資料檔的格式就加 1，並在 MIGRATIONS 加一步
+FORMAT = 4  # 資料格式版本：改了資料檔的格式就加 1，並在 MIGRATIONS 加一步
 ASSISTANTS = ("Claude", "Codex")  # 規劃助理：只研究和整理，不訂東西
 FIXED_ACTORS = ("使用者", *ASSISTANTS)  # 「下一步」開頭一律可以寫的；其他角色代稱寫在 seasoningway.toml 的 people.roles
 
@@ -71,10 +72,11 @@ def config_problems(root: Path) -> tuple[Config, list[str]]:
         except Problem:
             cfg = Config(format=FORMAT)
         return cfg, str(e).splitlines()
+    if not cfg.format:
+        what = f"{CONFIG} 還沒初始化" if (root / CONFIG).is_file() else f"還沒有 {CONFIG}"
+        return cfg, [f"{what}：這個目錄需要已建立的資料 repo"]
     if cfg.format < FORMAT:
-        how = (f"還沒有 {CONFIG}" if not (root / CONFIG).is_file() else f"{CONFIG} 還沒初始化" if cfg.format == 0
-               else f"資料格式是第 {cfg.format} 版，這版引擎要第 {FORMAT} 版")
-        return cfg, [f"{how}：執行 seasoningway migrate"]
+        return cfg, [f"資料格式是第 {cfg.format} 版，這版引擎要第 {FORMAT} 版：執行 seasoningway migrate"]
     if cfg.format > FORMAT:
         return cfg, [f"{CONFIG} 是第 {cfg.format} 版，比這版引擎（第 {FORMAT} 版）新：更新引擎"]
     return cfg, []
@@ -83,3 +85,9 @@ def config_problems(root: Path) -> tuple[Config, list[str]]:
 def find_root(start: Path) -> Path | None:
     start = start.resolve()
     return next((folder for folder in (start, *start.parents) if (folder / CONFIG).is_file()), None)
+
+
+def engine_warning(cfg: Config) -> str | None:
+    if cfg.engine and cfg.engine.split(".")[:2] != __version__.split(".")[:2]:
+        return f"{CONFIG} 指定引擎 {cfg.engine}，目前安裝的是 {__version__}：請使用指定版本或升級資料 repo"
+    return None

@@ -4,8 +4,9 @@
   "description": "地圖頁（seasoningway.tripmap）這趟旅程的設定：標題、類別、評分網站、旅行月份、開車參數、底圖範圍。景點是 places/*.json，日期取旅程 README 開頭的 start、end。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "short_title", "storage_prefix", "home", "categories", "season", "drive", "basemap"],
+  "required": ["$schema", "title", "short_title", "storage_prefix", "home", "categories", "season", "drive", "basemap"],
   "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/map.schema.json"},
     "title": {"type": "string", "minLength": 1, "description": "頁面標題（瀏覽器分頁）"},
     "heading": {"type": "string", "minLength": 1, "description": "頁首大標；沒寫＝short_title 加「：我的行程」"},
     "short_title": {"type": "string", "minLength": 1, "description": "短標題，用在「複製行程文字」「複製星號清單」的第一行"},
@@ -163,7 +164,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["wide", "fine"],
-      "description": "底圖（basemap_tiles.py 畫成 map/base/）：圖磚範圍 [基準縮放, x 起, x 迄, y 起, y 迄]，外圍拉遠看全程，細緻是景點所在的地區；和引擎固定用的 OpenStreetMap、山影以外的資料出處",
+      "description": "底圖（basemap_tiles.py 畫成 cache/base/）：圖磚範圍 [基準縮放, x 起, x 迄, y 起, y 迄]，外圍拉遠看全程，細緻是景點所在的地區；和引擎固定用的 OpenStreetMap、山影以外的資料出處",
       "properties": {
         "wide": {"type": "array", "items": {"type": "integer"}, "minItems": 5, "maxItems": 5},
         "fine": {"type": "array", "items": {"type": "integer"}, "minItems": 5, "maxItems": 5},

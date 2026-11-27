@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/itinerary.schema.json",
   "summary": "草案：照 README「已決定」排，交通是官網時刻表的粗估。",
   "days": [
     {

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from fixture_project import seed_project
 from seasoningway import __version__, cli
 
 
@@ -32,9 +33,9 @@ class CliTest(unittest.TestCase):
             self.assertIn(name, out)
 
     def test_unimplemented_command_points_to_migration_stage(self):
-        code, _, err = run("render", "some-trip")
+        code, _, err = run("guide", "scout")
         self.assertEqual(code, 2)
-        self.assertIn("docs/migration.md 第 2 階段", err)
+        self.assertIn("docs/migration.md 第 3 階段", err)
 
     def test_every_command_has_a_stage(self):
         for name, _, stage in cli.COMMANDS:
@@ -55,6 +56,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             return result.stdout
 
+        seed_project(root)
         invoke(root, "migrate")
         slug = "2099-02-elsewhere"
         invoke(root, "new", slug, "--title", "範例旅程", "--currency", "TWD", "--travelers", "2")
@@ -63,7 +65,12 @@ class CliTest(unittest.TestCase):
         self.assertIn("TWD", invoke(trip / "research", "budget", slug))
         self.assertIn("check 通過", invoke(trip, "check"))
         self.assertIn("check 通過", invoke(trip, "--root", str(root), "check"))
-        invoke(trip, "published", f"trips/{slug}", "v1", "--slug", "example", "--include", "budget.md")
+        self.assertFalse((trip / "budget.md").exists())
+        self.assertFalse((root / "out").exists())
+        invoke(trip, "render")
+        self.assertTrue((root / "out" / slug / "budget.md").is_file())
+        self.assertTrue((root / "out/index.md").is_file())
+        invoke(trip, "published", slug, "v1", "--slug", "example")
         self.assertTrue((trip / "published.json").is_file())
         self.assertEqual((root / "README.md").read_text(encoding="utf-8"), "# 自訂說明\n")
         self.assertFalse((root / "data").exists())

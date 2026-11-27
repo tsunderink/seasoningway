@@ -17,9 +17,11 @@ import json
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
+from ..common import Problem, real_date
 from .data import MapTrip
 
 OSRM = "https://router.project-osrm.org/route/v1/driving/{}?overview=false&steps=true"
@@ -65,10 +67,14 @@ def route(points: list[dict]) -> dict:
     coords = ";".join(f"{p['lon']},{p['lat']}" for p in points)
     for attempt in range(5):
         try:
-            return json.load(urllib.request.urlopen(OSRM.format(coords), timeout=30))["routes"][0]
-        except Exception:
-            time.sleep(3 * (attempt + 1))
-    raise SystemExit("OSRM 連不上，稍後再試")
+            with urllib.request.urlopen(OSRM.format(coords), timeout=30) as response:
+                return json.load(response)["routes"][0]
+        except (OSError, ValueError, KeyError, IndexError) as error:
+            if isinstance(error, urllib.error.HTTPError):
+                error.close()
+            if attempt < 4:
+                time.sleep(3 * (attempt + 1))
+    raise Problem("OSRM 沒有回傳可用的路線，稍後再試")
 
 
 def expressway_km(r: dict) -> float:
@@ -116,10 +122,21 @@ def closed(spot: dict, day: str) -> bool:
     return False
 
 
-def main(trip_dir: str, path: str) -> int:
-    days = json.loads(Path(path).read_text(encoding="utf-8"))["days"]
-    t = MapTrip(Path(trip_dir))
+def drive_report(trip_dir: Path, path: Path, today: datetime.date) -> str:
+    days = json.loads(path.read_text(encoding="utf-8"))["days"]
+    if isinstance(days, list):
+        days = {day["date"]: {"ids": day.get("places", []), "stay": day.get("stay_place")} for day in days}
+    if not isinstance(days, dict):
+        raise Problem(f"{path}：days 要是行程紀錄或地圖頁的逐日資料")
+    t = MapTrip(trip_dir)
     spots, drive = spots_of(t), Drive(t.config)
+    for day, plan in days.items():
+        if not real_date(day) or not isinstance(plan, dict) or not isinstance(plan.get("ids", []), list):
+            raise Problem(f"{path}：{day} 的日期或行程格式錯誤")
+        for point in [*plan.get("ids", []), plan.get("stay")]:
+            if point is not None and (not isinstance(point, str) or point not in spots):
+                raise Problem(f"{path}：{day} 指到不存在的地點 {point}")
+    lines = []
     prev, total, total_ex, driving = None, 0.0, 0.0, False
     for day in sorted(days):
         ids, stay = days[day].get("ids", []), days[day].get("stay")
@@ -148,10 +165,15 @@ def main(trip_dir: str, path: str) -> int:
             if shut:
                 flag += f"  ⚠️ 公休：{'、'.join(shut)}"
             wd = WEEKDAYS[datetime.date.fromisoformat(day).weekday()]
-            print(f"{day}（{wd}）{km:5.0f} km  {h:4.1f} 小時  高速 {ex:4.0f} km  {' → '.join(pts)}{'' if stay else '（沒排住處）'}{flag}")
+            lines.append(f"{day}（{wd}）{km:5.0f} km  {h:4.1f} 小時  高速 {ex:4.0f} km  {' → '.join(pts)}{'' if stay else '（沒排住處）'}{flag}")
             time.sleep(1)
         prev = stay or (ids[-1] if ids else prev)
-    print(f"合計 {total:.0f} km，高速至少 {total_ex:.0f} km（OSRM 路線，查詢於今天）")
+    lines.append(f"合計 {total:.0f} km，高速至少 {total_ex:.0f} km（OSRM 路線，查詢於 {today.isoformat()}）")
+    return "\n".join(lines) + "\n"
+
+
+def main(trip_dir: str, path: str) -> int:
+    print(drive_report(Path(trip_dir), Path(path), datetime.date.today()), end="")
     return 0
 
 

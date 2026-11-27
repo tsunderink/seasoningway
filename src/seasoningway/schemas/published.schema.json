@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "發布紀錄",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "slug", "version", "inputs"],
+  "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/published.schema.json"},
+    "slug": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "minLength": 1},
+    "inputs": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+  }
+}

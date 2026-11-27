@@ -4,12 +4,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote
 
-from .build import check_generated
-from .common import CONFIG, INDEX, TRIPS, real_date
+from .common import CONFIG, TRIPS, Problem, real_date
 from .config import ASSISTANTS, Config, config_problems
 from .gitops import files_to_scan
 from .pii import check_pii
@@ -17,7 +17,9 @@ from .published import published_states, unpublished
 from .records import (STALE_DAYS, missing_dependency, record_kind, record_paths,
                       record_problems, ref_problems, stale_values)
 from .trips import Trip, load_trips
-from .views import VIEW_SOURCES, render_index, section_lines, trip_views
+from .tripmap import build as map_build
+from .tripmap.render import MapPage
+from .views import VIEW_SOURCES, section_lines, trip_views
 
 
 ACCESSED_RE = re.compile(r"查詢於\s*(\d{4}-\d{2}-\d{2})")
@@ -43,7 +45,7 @@ def check_research(root: Path) -> list[str]:
 # ⚠️ 提醒（SessionStart 會列出，碰到那個檔案的回合順手修）：同一段重複引用同一來源、沒人連到的研究筆記、
 #   「已決定」裡的「見下」、README 各段項數、字數預算、「待決定」連到的筆記有過期引用、
 #   旅程資料夾裡同層沒有 README、或 README 沒提到的程式（.py、.mjs）、「已決定」開頭沒寫日期、「下一步」開頭沒寫誰做、
-#   不是助理（ASSISTANTS）做的「下一步」要訂東西卻沒連到 bookings.md、待訂的項目過了 book_on、artifact 的檔案改了還沒重新發布（published.json）、出發前 60 天內還沒有入境規定的筆記。
+#   不是助理（ASSISTANTS）做的「下一步」要訂東西卻沒連到 bookings.json、待訂的項目過了 book_on、artifact 的檔案改了還沒重新發布（published.json）、出發前 60 天內還沒有入境規定的筆記。
 
 LINK_RE = re.compile(r"\]\(([^)\s]+)\)")
 RESEARCH_REF_RE = re.compile(r"research/[A-Za-z0-9_./-]+\.md")
@@ -80,15 +82,17 @@ def hygiene_files(root: Path) -> list[Path]:
     return [p for p in files_to_scan(root) if p.suffix in (".md", ".json")]
 
 
-def link_problems(root: Path, path: Path) -> list[str]:
+def link_problems(root: Path, path: Path, text: str | None = None) -> list[str]:
     rel = path.relative_to(root).as_posix()
     if path.suffix != ".md":
         return []
+    if text is None:
+        text = path.read_text(encoding="utf-8")
     return [
         f"{rel}:{n}：連結 {target} 指向不存在的檔案"
-        for n, line in enumerate(prose(path.read_text(encoding="utf-8")).splitlines(), 1)
+        for n, line in enumerate(prose(text).splitlines(), 1)
         for target in LINK_RE.findall(line)
-        if not re.match(r"[a-z]+:|#", target) and not (path.parent / link_path(target)).exists()
+        if not re.match(r"[a-z][a-z0-9+.-]*:|#|//", target, re.I) and not (path.parent / link_path(target)).exists()
     ]
 
 
@@ -171,8 +175,6 @@ def hygiene_warnings(root: Path, files: list[Path], today: date, cfg: Config) ->
                         counts[u] = counts.get(u, 0) + 1
             if path.resolve() not in linked:
                 warnings.append(f"{rel}：沒有任何檔案連到它；還有用就從 README 或相關筆記連過來，沒用就刪")
-    if cfg.publish == "artifact":
-        warnings += unpublished(root)
     for script in sorted(p for ext in ("*.py", "*.mjs") for p in (root / TRIPS).glob(f"*/**/{ext}")):
         readme, rel = script.parent / "README.md", script.relative_to(root).as_posix()
         if "__pycache__" in script.parts:
@@ -194,8 +196,8 @@ def hygiene_warnings(root: Path, files: list[Path], today: date, cfg: Config) ->
             if line.startswith("- ") and not line[2:].startswith(cfg.actors):
                 warnings.append(f"{TRIPS}/{trip.slug}/README.md「下一步」要先寫誰做（{'、'.join(cfg.actors)}；"
                                 f"角色代稱寫在 {CONFIG} 的 people.roles）：{line[2:22]}…")
-            elif not line[2:].startswith(ASSISTANTS) and re.search(r"(?<![補已])訂(?!單)", line) and "bookings.md" not in line:
-                warnings.append(f"{TRIPS}/{trip.slug}/README.md「下一步」：要訂的東西寫進 bookings.json（附建議預訂時間、連結），再連到 bookings.md：{line[2:22]}…")
+            elif not line[2:].startswith(ASSISTANTS) and re.search(r"(?<![補已])訂(?!單)", line) and "bookings.json" not in line:
+                warnings.append(f"{TRIPS}/{trip.slug}/README.md「下一步」：要訂的東西寫進 bookings.json（附建議預訂時間、連結），再連到 bookings.json：{line[2:22]}…")
         if any("見下" in l for l in section_lines(readme, "已決定")):
             warnings.append(f"{TRIPS}/{trip.slug}/README.md「已決定」有「見下」：決定改了就改原來那一條")
         if trip.active:
@@ -291,11 +293,20 @@ def stale_plan_places(root: Path, trip: Trip, today: date) -> list[str]:
             f"{'、'.join(list(stale)[:5])}{more}，做決定前重查 places/ 裡的這幾筆（照 recheck skill）"]
 
 
-def run_check(root: Path, today: date) -> tuple[list[str], list[str]]:
+@dataclass
+class CheckReport:
+    problems: list[str]
+    warnings: list[str] = field(default_factory=list)
+    pages: dict[str, dict[str, str]] = field(default_factory=dict)
+    maps: dict[str, MapPage] = field(default_factory=dict)
+
+
+def inspect_data(root: Path, today: date) -> CheckReport:
     cfg, problems = config_problems(root)
-    warnings: list[str] = []
-    if not cfg.format:  # 還沒初始化：先 migrate，其他的問題都是它的後果
-        return problems, warnings
+    report = CheckReport(problems)
+    warnings = report.warnings
+    if not cfg.format:  # 還沒初始化，其他的問題都是它的後果
+        return report
     if not cfg.git_mode:
         warnings.append(f"{CONFIG} 還沒設定 git.mode：問使用者回合結束怎麼保存（main：直接 push 到 main；branch：push 到目前分支；"
                         "local：只 commit），寫進 [git] mode。設定前照 local 做，雲端 session 沒 push 的改動會隨容器消失")
@@ -308,44 +319,57 @@ def run_check(root: Path, today: date) -> tuple[list[str], list[str]]:
         ]
     missing = missing_dependency()
     if missing:
-        return problems + [missing], warnings
+        problems.append(missing)
+        return report
     not_utf8 = [f"{p.relative_to(root).as_posix()}：不是 UTF-8，用 UTF-8 重新存檔" for p in hygiene_files(root) if not is_utf8(p)]
     if not_utf8:  # 後面的檢查都當 UTF-8 讀
-        return problems + not_utf8, warnings
+        problems.extend(not_utf8)
+        return report
     trips = load_trips(root)
+    record_issues, bad = check_records(root, trips)
+    problems += record_issues
     for t in trips:
         views, trip_problems, trip_warnings = trip_views(t, root, today)
         problems += trip_problems
         warnings += trip_warnings
         for name, text in views.items():
-            path = t.path / name
-            if not path.is_file() or path.read_text(encoding="utf-8") != text:
-                problems.append(f"{TRIPS}/{t.slug}/{name} 不是最新，請執行 seasoningway build")
-            elif name in VIEW_SOURCES:  # 視圖不在 hygiene_files 裡，連結在這裡查，改來源的 JSON
-                problems += [f"{p}（改 {VIEW_SOURCES[name][0]}）" for p in link_problems(root, path)]
-    index = root / INDEX
-    if not index.is_file() or index.read_text(encoding="utf-8") != render_index(trips):
-        problems.append(f"{INDEX} 不是最新，請執行 seasoningway build")
-    record_issues, bad = check_records(root, trips)
-    problems += record_issues
+            source = VIEW_SOURCES[name][0] if name in VIEW_SOURCES else "budget.json"
+            problems += [f"{p}（改 {source}）" for p in link_problems(root, t.path / name, text)]
+        if not trip_problems and t.path not in bad and (t.path / "map/config.json").exists():
+            try:
+                report.maps[t.slug] = map_build.load_page(t.path)
+            except Problem as error:
+                problems.extend(str(error).splitlines())
+        report.pages[t.slug] = views
     warnings += [w for t in trips for w in stale_plan_places(root, t, today)]
-    problems += check_generated(root, bad)
     problems += check_research(root)
     problems += check_pii(root)
     problems += check_conflicts(root)
-    problems += published_states(root)[1]
+    states, publication_problems = published_states(root)
+    problems += publication_problems
+    if cfg.publish == "artifact":
+        warnings += unpublished(root, states)
     files = hygiene_files(root)
-    views = {t.path / name for t in trips for name in ("budget.md", *VIEW_SOURCES)}  # 上面查過了
-    problems += check_links(root, [f for f in files if f not in views])
+    problems += check_links(root, files)
     warnings += hygiene_warnings(root, files, today, cfg)
-    return problems, warnings
+    report.problems = list(dict.fromkeys(problems))
+    return report
 
 
-def cmd_check(args: argparse.Namespace, root: Path, today: date) -> int:
-    problems, warnings = run_check(root, today)
+def run_check(root: Path, today: date) -> tuple[list[str], list[str]]:
+    report = inspect_data(root, today)
+    return report.problems, report.warnings
+
+
+def print_issues(problems: list[str], warnings: list[str]) -> None:
     for w in warnings:
         print(f"⚠️ {w}")
     for p in problems:
         print(f"✗ {p}")
+
+
+def cmd_check(args: argparse.Namespace, root: Path, today: date) -> int:
+    problems, warnings = run_check(root, today)
+    print_issues(problems, warnings)
     print("check 通過" if not problems else f"check 沒通過：{len(problems)} 個問題")
     return 1 if problems else 0

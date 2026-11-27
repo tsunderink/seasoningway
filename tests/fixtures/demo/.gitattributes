@@ -1,9 +1,1 @@
 * text=auto eol=lf
-
-# 第 1 階段沿用的產物標記。
-/trip-index.md linguist-generated
-trips/*/budget.md linguist-generated
-trips/*/bookings.md linguist-generated
-trips/*/itinerary.md linguist-generated
-trips/*/map/index.html linguist-generated
-trips/*/**/published.json linguist-generated

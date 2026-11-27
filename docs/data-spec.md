@@ -15,7 +15,7 @@
 | 設定 | `seasoningway.toml` | 使用者、規劃助理 | [config.schema.json](../src/seasoningway/schemas/config.schema.json) |
 | 紀錄 | JSON | 規劃助理、subagent、工具 | [schemas/](../src/seasoningway/schemas/)＋領域規則 |
 | 筆記 | Markdown；旅程 README 開頭的設定也用 schema 驗（`trip.schema.json`） | 規劃助理 | 引用格式、連結；只放理由、比較、結論，事實放紀錄 |
-| 視圖 | 由紀錄產生 | `seasoningway build` | 第 1 階段由 check 比對是否最新 |
+| 視圖 | 由紀錄產生，寫到 `out/` | `seasoningway render` | 先驗證來源再產出 |
 
 repo 以外：artifact 資料庫只存使用者在頁面上的輸入；API 金鑰存在雲端環境的網路密鑰；使用者在對話中給的個資只當下用。
 
@@ -30,6 +30,7 @@ repo 以外：artifact 資料庫只存使用者在頁面上的輸入；API 金�
 | 地圖設定 | `trips/<旅程>/map/config.json` | `map` | 地圖頁 |
 | 個人資料、想去（之後） | `profile/profile.json`、`wishlist.json` | — | — |
 
+- 每項紀錄最上層有 `$schema`，使用引擎 repo 公開的對應 schema。第 4 版由 `migrate` 補上。
 - 物件一律 `additionalProperties: false`，沒定義的欄位不能存。填法寫在欄位的 `description`，檔案裡不放註解。
 - 會個別修改、數量多的一筆一檔（地點）：差異和合併以一筆為單位，不會再有超過 100 KB 的檔。數量少、整份一起看的放一個檔（預訂、行程）。
 - 寫法：2 格縮排、UTF-8、中文不轉義、結尾換行（`records.dump_json`）。check 只驗內容，不驗寫法。
@@ -59,7 +60,7 @@ repo 以外：artifact 資料庫只存使用者在頁面上的輸入；API 金�
 
 - 讀：直接讀檔；跨多筆查用 Grep 或 `jq`；給人看的總表是視圖。
 - 直接寫 JSON 檔，執行 `seasoningway check` 驗證 schema、領域規則和 `x-ref`。寫入時的回饋見 [設計的品質關卡](design.md#5-品質關卡)。
-- 第 1 階段用 `seasoningway build` 更新舊版視圖，`check` 比對產物。地圖的來源及產物位置見 [地圖引擎](tripmap.md)。
+- 視圖的位置與快取規則見 [產物與快取](design.md#4-產物與快取)，地圖的來源見 [地圖引擎](tripmap.md)。
 - 格式升級見 [設計的版本規則](design.md#7-版本)。
 
 ## 8. repo 以外的狀態

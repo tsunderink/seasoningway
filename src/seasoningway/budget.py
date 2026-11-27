@@ -138,7 +138,7 @@ def render_budget(b: Budget) -> str:
     plan = [l for l in b.lines if l.status in PLAN_STATUSES]
     actual = [l for l in b.lines if l.status == "實付"]
     out = [
-        GENERATED.format(how=f"修改 budget.json 後執行 seasoningway budget {t.slug}"),
+        GENERATED.format(how=f"修改 budget.json 後執行 seasoningway render {t.slug}"),
         "",
         f"# 預算摘要：{t.title}",
         "",
@@ -265,15 +265,8 @@ def budget_summary(b: Budget) -> list[str]:
     return lines
 
 
-def write_budget(trip: Trip, root: Path) -> Budget:
-    b = compute_budget(trip, root)
-    (trip.path / "budget.md").write_text(render_budget(b), encoding="utf-8", newline="\n")
-    return b
-
-
 def cmd_budget(args: argparse.Namespace, root: Path, today: date) -> int:
-    b = write_budget(load_trip(root, args.slug), root)
-    print(f"已更新 {TRIPS}/{args.slug}/budget.md")
+    b = compute_budget(load_trip(root, args.slug), root)
     print("\n".join(budget_summary(b)))
     for w in budget_warnings(b, today):
         print(f"⚠️ {w}")

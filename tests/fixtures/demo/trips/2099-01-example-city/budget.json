@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/tsunderink/seasoningway/main/src/seasoningway/schemas/budget.schema.json",
   "rates": [
     {
       "currency": "JPY",

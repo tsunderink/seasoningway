@@ -16,7 +16,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from seasoningway import __version__, budget, build, checks, cli, common, config, gitops, pii, project, records, trips, views
+from seasoningway import __version__, budget, checks, cli, common, config, gitops, pii, project, records, trips, views
+
+from fixture_project import seed_project
 
 FIXTURES = Path(__file__).with_name("fixtures")
 
@@ -219,8 +221,7 @@ class ScanTest(unittest.TestCase):
 class RepoTest(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        with contextlib.redirect_stdout(io.StringIO()):  # 初始化
-            self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 0)
+        seed_project(self.root)
         self.set_config('default_currency = ""', 'default_currency = "TWD"')
         self.trip = project.create_trip(self.root, "2099-01-example-city", "範例市冬遊", 2, None, TODAY)
 
@@ -231,7 +232,11 @@ class RepoTest(unittest.TestCase):
         path.write_text(text.replace(old, new), encoding="utf-8")
 
     def write_record(self, name: str, data: dict):
-        (self.trip.path / name).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        path = self.trip.path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        kind = records.record_kind(path.relative_to(self.root).as_posix())
+        payload = {"$schema": records.schema_url(kind), **data} if kind else data
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     def write_budget(self, items: list[dict], rates: list[dict] = FX):
         self.write_record("budget.json", {"rates": rates, "items": items})
@@ -245,13 +250,15 @@ class RepoTest(unittest.TestCase):
         self.assertEqual(self.trip.travelers, 2)
         self.assertTrue((self.trip.path / "research").is_dir())
         self.assertNotIn("{{", (self.trip.path / "README.md").read_text(encoding="utf-8"))
-        self.assertIn("範例市冬遊", (self.root / common.INDEX).read_text(encoding="utf-8"))
+        self.assertFalse((self.root / common.OUT).exists())
+        self.assertEqual(json.loads((self.trip.path / "budget.json").read_text(encoding="utf-8"))["$schema"],
+                         records.schema_url("budget"))
         with self.assertRaises(common.Problem):
             project.create_trip(self.root, "2099-01-example-city", None, 1, None, TODAY)
         with self.assertRaises(common.Problem):
             project.create_trip(self.root, "example-city", None, 1, None, TODAY)
 
-    def test_migrate_initializes_and_keeps_existing_files(self):
+    def test_migrate_current_version_keeps_existing_files(self):
         cfg = config.load_config(self.root)
         self.assertEqual(cfg.engine, __version__)
         self.assertEqual((cfg.format, cfg.default_currency, cfg.git_mode), (config.FORMAT, "TWD", ""))  # git.mode 等使用者決定
@@ -262,17 +269,14 @@ class RepoTest(unittest.TestCase):
             self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 0)  # 已經是最新版：不動
         self.assertIn("本來就是", out.getvalue())
         self.assertFalse((self.root / "wishlist.md").exists())
-        (self.root / common.CONFIG).unlink()
-        with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 0)  # 沒有設定檔就初始化：補上缺的檔，已經有的不蓋掉
-        self.assertTrue((self.root / "wishlist.md").is_file())
         self.assertEqual(prefs.read_text(encoding="utf-8"), "# 偏好\n\n- 不吃生食\n")
+
+    def test_migrate_requires_existing_initialized_repo(self):
         fresh = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(cli.main(["--root", str(fresh), "migrate"], today=TODAY), 0)
-        for name in ("seasoningway.toml", "profile/preferences.md", "profile/lessons.md", "wishlist.md", common.INDEX, ".gitattributes"):
-            self.assertTrue((fresh / name).is_file(), name)
-        self.assertEqual(config.load_config(fresh).default_currency, "")
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(cli.main(["--root", str(fresh), "migrate"], today=TODAY), 1)
+        self.assertIn("migrate 需要已建立的資料 repo", err.getvalue())
+        self.assertEqual(list(fresh.iterdir()), [])
 
     def test_migrate_refuses_versions_it_cannot_upgrade(self):
         self.set_config(f"format = {config.FORMAT}", f"format = {config.FORMAT + 1}")
@@ -285,12 +289,12 @@ class RepoTest(unittest.TestCase):
                 self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 1)
             self.assertIn("舊版的引擎", err.getvalue())
 
-    def test_commands_ask_to_initialize_first(self):
+    def test_commands_need_a_data_repo(self):
         fresh = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        for command in (["build"], ["budget", "2099-01-example-city"], ["new", "2099-01-example-city"]):
+        for command in (["budget", "2099-01-example-city"], ["new", "2099-01-example-city"]):
             with self.subTest(command=command), contextlib.redirect_stderr(io.StringIO()) as err:
                 self.assertEqual(cli.main(["--root", str(fresh), *command], today=TODAY), 1)
-                self.assertIn("先執行 seasoningway migrate", err.getvalue())
+                self.assertIn("需要已建立的資料 repo", err.getvalue())
 
     def test_config_problems(self):
         self.assertEqual(config.config_problems(self.root)[1], [])
@@ -332,21 +336,25 @@ class RepoTest(unittest.TestCase):
             self.assertEqual(config.config_problems(self.root)[1], [])
 
         shutil.copy(project.TEMPLATES / "project" / common.CONFIG, path)  # 直接複製範本（format = 0）
-        self.assertEqual(config.config_problems(self.root)[1], [f"{common.CONFIG} 還沒初始化：執行 seasoningway migrate"])
-        for command in (["build"], ["new", "2099-02-example-city", "--currency", "TWD"]):  # 讀資料的指令只提示 migrate
+        self.assertEqual(config.config_problems(self.root)[1], [f"{common.CONFIG} 還沒初始化：這個目錄需要已建立的資料 repo"])
+        for command in (["budget", self.trip.slug], ["new", "2099-02-example-city", "--currency", "TWD"]):  # 讀資料的指令只提示 migrate
             with self.subTest(command=command), contextlib.redirect_stderr(io.StringIO()) as err:
                 self.assertEqual(cli.main(command, root=self.root, today=TODAY), 1)
-            self.assertIn("還沒初始化：先執行 seasoningway migrate", err.getvalue())
+            self.assertIn("還沒初始化", err.getvalue())
         self.assertFalse((self.root / "trips" / "2099-02-example-city").exists())
-        with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 0)
-        self.assertEqual(config.config_problems(self.root)[1], [])
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 1)
+        self.assertIn("還沒初始化", err.getvalue())
 
     def test_wrongly_typed_records_are_reported_without_crashing(self):
         itinerary = self.trip.path / "itinerary.json"
         for bad in ('{"days": [1]}', '{"days": {"a": 1}}', '[]', '{"days": [{"places": 5}]}', '{"days": [{"stay_place": ["x"]}]}'):
             with self.subTest(bad=bad):
-                itinerary.write_text(bad, encoding="utf-8")
+                data = json.loads(bad)
+                if isinstance(data, dict):
+                    self.write_record("itinerary.json", data)
+                else:
+                    itinerary.write_text(bad, encoding="utf-8")
                 self.assertTrue(any("itinerary.json" in p for p in checks.run_check(self.root, TODAY)[0]))
         (self.trip.path / "places").mkdir(exist_ok=True)
         (self.trip.path / "places" / "a.json").write_text("[]", encoding="utf-8")
@@ -367,7 +375,7 @@ class RepoTest(unittest.TestCase):
         self.assertNotIn("「下一步」要先寫誰做", "\n".join(checks.run_check(self.root, TODAY)[1]))
         page = self.trip.path / "map"
         page.mkdir()
-        (page / "published.json").write_text('{"slug": "s", "version": "", "include": ["*.html"], "files": {"a.html": "x"}}', encoding="utf-8")
+        self.write_record("map/published.json", {"slug": "s", "version": "v1", "inputs": {}})
         self.assertIn("上次發布", "\n".join(checks.run_check(self.root, TODAY)[1]))
         self.set_config('target = "artifact"', 'target = "none"')
         self.assertNotIn("上次發布", "\n".join(checks.run_check(self.root, TODAY)[1]))
@@ -442,7 +450,7 @@ class RepoTest(unittest.TestCase):
         b.trip.meta["status"] = "已結束"
         self.assertEqual(budget.budget_warnings(b, TODAY), [])
 
-    def test_check_flags_stale_outputs_research_and_pii(self):
+    def test_check_flags_research_and_pii_without_comparing_outputs(self):
         problems, _ = checks.run_check(self.root, TODAY)
         self.assertEqual(problems, [])
         self.write_budget([item("住宿", "飯店", 10000, "JPY")])
@@ -454,11 +462,11 @@ class RepoTest(unittest.TestCase):
         self.write_record("bookings.json", {"items": [{"id": "inn", "item": "民宿", "status": "待訂", "note": "老闆手機 0912-345-678"}]})
         problems, _ = checks.run_check(self.root, TODAY)
         joined = "\n".join(problems)
-        self.assertIn("budget.md 不是最新，請執行 seasoningway build", joined)
-        self.assertIn("bookings.md 不是最新", joined)
+        self.assertNotIn("不是最新", joined)
+        self.assertFalse((self.root / "out").exists())
         self.assertIn("transport.md:1", joined)
         self.assertNotIn("transport.md:2", joined)
-        self.assertIn("bookings.json:7：疑似手機號碼", joined)
+        self.assertRegex(joined, r"bookings\.json:\d+：疑似手機號碼")
 
     def test_file_problems_checks_nested_research_notes(self):
         note = self.trip.path / "research" / "a" / "b" / "c.md"
@@ -466,12 +474,11 @@ class RepoTest(unittest.TestCase):
         note.write_text("- 票價（[官網](https://example.com)）\n", encoding="utf-8")
         self.assertIn("c.md:1", "\n".join(checks.file_problems(self.root, note)))
 
-    def test_pii_scan_skips_generated_files(self):
-        subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
-        (self.root / ".gitattributes").write_text("trips/*/map/index.html linguist-generated\n", encoding="utf-8")
+    def test_pii_scan_skips_out(self):
+        (self.root / "out").mkdir()
+        (self.root / "out/index.html").write_text("手機 0912-345-678\n", encoding="utf-8")
         (self.trip.path / "map").mkdir()
-        (self.trip.path / "map" / "index.html").write_text("手機 0912-345-678\n", encoding="utf-8")
-        (self.trip.path / "map" / "template.html").write_text("手機 0912-345-678\n", encoding="utf-8")
+        (self.trip.path / "map/template.html").write_text("手機 0912-345-678\n", encoding="utf-8")
         joined = "\n".join(pii.check_pii(self.root))
         self.assertNotIn("index.html", joined)
         self.assertIn("template.html:1：疑似手機號碼", joined)
@@ -486,7 +493,7 @@ class RepoTest(unittest.TestCase):
         readme = self.trip.path / "README.md"
         readme.write_text(readme.read_text(encoding="utf-8").replace(
             "## 已決定\n", "## 已決定\n\n- 2026-11-17：住範例市（2026-11-18 改，見下）\n- 見 [舊筆記](research/gone.md)、`[範例](URL)`\n"
-        ).replace("## 下一步\n", "## 下一步\n\n- 使用者 12/1 訂票\n- 使用者看確認信：訂單含不含保險\n- 查營業時間\n- 使用者 12/2 訂門票（[bookings.md](bookings.md)）\n"
+        ).replace("## 下一步\n", "## 下一步\n\n- 使用者 12/1 訂票\n- 使用者看確認信：訂單含不含保險\n- 查營業時間\n- 使用者 12/2 訂門票（[bookings.json](bookings.json)）\n"
                     "- 我 12/3 訂車\n- Claude 查哪天開放預訂\n- Codex 整理要訂的票\n"),
             encoding="utf-8")
         problems, warnings = checks.run_check(self.root, TODAY)
@@ -611,87 +618,60 @@ class RepoTest(unittest.TestCase):
     def test_unreadable_published_state_is_reported_and_rebuilt(self):
         page = self.trip.path / "map"
         page.mkdir()
-        (page / "index.html").write_text("v1", encoding="utf-8")
-        (page / "published.json").write_text('<<<<<<< HEAD\n{"slug": "s"}\n=======\n>>>>>>> x\n', encoding="utf-8")
-        self.assertIn("map/published.json 讀不了（例如合併衝突", "\n".join(checks.run_check(self.root, TODAY)[0]))
-        for include in ('"index.html"', '["/x"]', '[""]', '["../x"]', '[]'):  # 格式不對：報 ✗，不丟 traceback
-            with self.subTest(include=include):
-                (page / "published.json").write_text(f'{{"slug": "s", "version": "v1", "include": {include}, "files": {{}}}}\n',
-                                                     encoding="utf-8")
-                self.assertIn("map/published.json 讀不了", "\n".join(checks.run_check(self.root, TODAY)[0]))
-        err = io.StringIO()
-        with contextlib.redirect_stderr(err):
-            self.assertEqual(cli.main(["published", f"trips/{self.trip.slug}/map", "v2", "--slug", "s", "--include", ""],
-                                        root=self.root, today=TODAY), 1)
-        self.assertIn("--include 的樣式要是資料夾裡的相對路徑", err.getvalue())
+        state = page / "published.json"
+        state.write_text('<<<<<<< HEAD\n{"slug": "s"}\n=======\n>>>>>>> x\n', encoding="utf-8")
+        self.assertIn("map/published.json:1：JSON 格式錯誤", "\n".join(checks.run_check(self.root, TODAY)[0]))
+        for inputs in ("index.html", {"bad": "invalid"}, []):
+            with self.subTest(inputs=inputs):
+                self.write_record("map/published.json", {"slug": "s", "version": "v1", "inputs": inputs})
+                self.assertIn("map/published.json：inputs", "\n".join(checks.run_check(self.root, TODAY)[0]))
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(cli.main(["published", f"trips/{self.trip.slug}/map", "v2", "--slug", "s", "--include", "*.html"],
-                                        root=self.root, today=TODAY), 0)
+            self.assertEqual(cli.main(["published", f"trips/{self.trip.slug}/map", "v2", "--slug", "s"],
+                                      root=self.root, today=TODAY), 0)
+            self.assertEqual(cli.main(["published", self.trip.slug, "v3"], root=self.root, today=TODAY), 0)
+        self.assertEqual(json.loads(state.read_text(encoding="utf-8"))["version"], "v3")
         self.assertEqual(checks.run_check(self.root, TODAY)[0], [])
 
     @unittest.skipUnless(supports_directory_symlinks(), "目前的 Windows 環境無法建立目錄符號連結")
     def test_published_accepts_symlinked_root(self):
-        page = self.trip.path / "map"
-        page.mkdir()
-        (page / "index.html").write_text("v1", encoding="utf-8")
         link = self.root.parent / (self.root.name + "-link")
         link.symlink_to(self.root, target_is_directory=True)
         self.addCleanup(link.unlink)
-        with contextlib.redirect_stdout(io.StringIO()):  # 從符號連結的路徑跑也認得出資料夾
-            self.assertEqual(cli.main(["published", f"trips/{self.trip.slug}/map", "v2", "--slug", "s", "--include", "*.html"],
-                                        root=link, today=TODAY), 0)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["published", self.trip.slug, "v2", "--slug", "s"],
+                                      root=link, today=TODAY), 0)
         self.assertEqual(checks.run_check(self.root, TODAY)[0], [])
 
-    def test_unpublished_artifact_files_warn(self):
-        page = self.trip.path / "map"
-        page.mkdir()
-        (page / "index.html").write_text("v1", encoding="utf-8")
-        folder = f"trips/{self.trip.slug}/map"
+    def test_unpublished_source_and_cache_changes_warn(self):
+        cache = self.trip.path / "cache"
+        cache.mkdir()
+        (cache / "drive.txt").write_text("v1", encoding="utf-8")
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
-            self.assertEqual(cli.main(["published", folder, "v1"], root=self.root, today=TODAY), 1)
-            self.assertEqual(cli.main(["published", "core", "v1", "--slug", "s", "--include", "*"], root=self.root, today=TODAY), 1)
-        self.assertIn("沒有可用的 published.json：加 --slug", err.getvalue())
-        with contextlib.redirect_stdout(io.StringIO()):  # 第一次發布
-            self.assertEqual(cli.main(["published", folder, "v1", "--slug", "s", "--include", "*.html"], root=self.root, today=TODAY), 0)
-        self.assertEqual(json.loads((page / "published.json").read_text(encoding="utf-8"))["include"], ["*.html"])
+            self.assertEqual(cli.main(["published", self.trip.slug, "v1"], root=self.root, today=TODAY), 1)
+            self.assertEqual(cli.main(["published", "outside", "v1", "--slug", "s"], root=self.root, today=TODAY), 1)
+        self.assertIn("第一次記錄時加 --slug", err.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["published", self.trip.slug, "v1", "--slug", "s"], root=self.root, today=TODAY), 0)
+            self.assertEqual(cli.main(["render", self.trip.slug], root=self.root, today=TODAY), 0)
+        state = json.loads((self.trip.path / "published.json").read_text(encoding="utf-8"))
+        self.assertIn("cache/drive.txt", state["inputs"])
+        self.assertIn("budget.json", state["inputs"])
+        self.assertNotIn("published.json", state["inputs"])
+        (self.root / "out" / self.trip.slug / "budget.md").write_text("v2", encoding="utf-8")
         self.assertNotIn("上次發布", "\n".join(checks.run_check(self.root, TODAY)[1]))
-        (page / "index.html").write_text("v2", encoding="utf-8")
-        (page / "new.html").write_text("x", encoding="utf-8")
-        self.assertIn("index.html、new.html和上次發布的不一樣", "\n".join(checks.run_check(self.root, TODAY)[1]))
-        (page / "README.md").write_text("| `build.py` | 產生 |\n", encoding="utf-8")
-        (page / "build.py").write_text("", encoding="utf-8")
-        (page / "old.py").write_text("", encoding="utf-8")
-        joined = "\n".join(checks.run_check(self.root, TODAY)[1])
-        self.assertIn("map/old.py：同資料夾的 README.md 沒提到它", joined)
-        self.assertNotIn("build.py：同資料夾", joined)
+        (cache / "drive.txt").unlink()
+        self.write_budget([item("住宿", "飯店", 10000, "JPY")])
+        warnings = "\n".join(checks.run_check(self.root, TODAY)[1])
+        self.assertIn("budget.json、cache/drive.txt和上次發布的不一樣", warnings)
 
-    def test_check_runs_trip_build_scripts(self):
+    def test_check_and_render_do_not_run_trip_scripts(self):
         tool = self.trip.path / "map"
         tool.mkdir()
-        (tool / "build.py").write_text(
-            "import sys\n"
-            "if '--check' in sys.argv and open('data.txt').read() != 'ok':\n"
-            "    print('index.html 不是最新'); sys.exit(1)\n",
-            encoding="utf-8",
-        )
-        (tool / "data.txt").write_text("ok", encoding="utf-8")
-        problems, _ = checks.run_check(self.root, TODAY)
-        self.assertEqual(problems, [])
-        (tool / "data.txt").write_text("stale", encoding="utf-8")
-        problems, _ = checks.run_check(self.root, TODAY)
-        self.assertEqual(len(problems), 1)
-        self.assertIn("map/build.py --check 沒通過：index.html 不是最新", problems[0])
-        (tool / "build.py").write_text(
-            "import sys\n"
-            "if '--check' in sys.argv: sys.exit(open('data.txt').read() != 'ok')\n"
-            "open('data.txt', 'w').write('ok')\n",
-            encoding="utf-8",
-        )
+        (tool / "build.py").write_text("raise RuntimeError('must not run')\n", encoding="utf-8")
+        self.assertEqual(checks.run_check(self.root, TODAY)[0], [])
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(build.cmd_build(None, self.root, TODAY), 0)
-        problems, _ = checks.run_check(self.root, TODAY)
-        self.assertEqual(problems, [])
+            self.assertEqual(cli.main(["render"], root=self.root, today=TODAY), 0)
 
     def test_bookings_view_sorts_and_warns(self):
         self.write_record("bookings.json", {"note": "取消期限是當地時間 23:59。", "items": [
@@ -721,9 +701,11 @@ class RepoTest(unittest.TestCase):
             {"date": "2099-01-06", "plan": "範例寺", "stay": "飯店 A"},
             {"date": "2099-01-07", "plan": "回家"},
         ], "notes": "交通都是粗估。"})
-        with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(build.cmd_build(None, self.root, TODAY), 0)  # 壞連結由 check 擋
-        text = (self.trip.path / "itinerary.md").read_text(encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.main(["render"], root=self.root, today=TODAY), 1)
+        self.assertIn("research/old-town.md", out.getvalue())
+        self.assertFalse((self.root / "out").exists())
+        text = views.trip_views(self.trip, self.root, TODAY)[0]["itinerary.md"]
         self.assertIn("草案。\n\n| 日期 | 去哪 | 住 | 交通 |", text)
         self.assertIn("| 1/5（一，連假） | 老街（[筆記](research/old-town.md)） | 飯店 A | 巴士 30 分鐘 |", text)
         self.assertIn("| 1/6（二） | 範例寺 | 同上 | — |", text)
@@ -738,7 +720,10 @@ class RepoTest(unittest.TestCase):
         self.write_record("itinerary.json", {"days": [{"date": "2099-01-02"}, {"date": "2099-01-01"}]})
         joined = "\n".join(checks.run_check(self.root, TODAY)[0])
         self.assertIn("bookings.json：items[1].date（a）：'2027-02-30' is not a 'date'", joined)
-        bookings = records.record_problems(f"trips/{self.trip.slug}/bookings.json", '{"items": [{"id": "a", "item": "x", "status": "待訂"}, {"id": "a", "item": "y", "status": "已訂"}]}')
+        self.write_record("bookings.json", {"items": [{"id": "a", "item": "x", "status": "待訂"},
+                                                     {"id": "a", "item": "y", "status": "已訂"}]})
+        path = self.trip.path / "bookings.json"
+        bookings = records.record_problems(path.relative_to(self.root).as_posix(), path.read_text(encoding="utf-8"))
         self.assertEqual(bookings, [f"trips/{self.trip.slug}/bookings.json：items[1]：id a 重複"])
         self.assertIn("itinerary.json：days 要依日期排", joined)
         self.assertIn("JSON 格式錯誤", records.record_problems(f"trips/{self.trip.slug}/budget.json", "{")[0])
@@ -756,7 +741,7 @@ class RepoTest(unittest.TestCase):
     def write_place(self, data: dict, name: str | None = None):
         (self.trip.path / "places").mkdir(exist_ok=True)
         path = self.trip.path / "places" / f"{name or data['id']}.json"
-        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        self.write_record(path.relative_to(self.trip.path).as_posix(), data)
 
     def test_check_validates_places_refs_and_stale_plan_places(self):
         self.write_place(self.place("temple", as_of="2026-10-01"))
@@ -773,7 +758,6 @@ class RepoTest(unittest.TestCase):
         self.assertIn("shrine.json：電話 075-123-4567 要放在 contact.phone", "\n".join(checks.run_check(self.root, TODAY)[0]))
         self.write_place(self.place("shrine", contact={"phone": "075-123-4567"}, facts=[{"label": "地址", "value": "範例市 1-15-11"}]))
         self.write_record("itinerary.json", {"days": [{"date": "2099-01-01", "places": ["temple"], "stay_place": "shrine"}]})
-        views.write_views(self.trip, self.root, TODAY)
         problems, warnings = checks.run_check(self.root, TODAY)
         self.assertEqual(problems, [])
         self.assertIn("itinerary.json 用到的地點查詢超過 30 天（最舊 2026-10-01）：temple，做決定前重查", "\n".join(warnings))
@@ -792,11 +776,10 @@ class RepoTest(unittest.TestCase):
         config = {"title": "t", "short_title": "t", "storage_prefix": "t", "home": "temple",
                   "categories": [{"id": "food", "glyph": "食", "name": "美食"}], "season": {"label": "4 月", "tiers": {
                       str(i): "x" for i in range(1, 6)}}, "drive": {"max_hours": 4}, "basemap": {"wide": [7, 0, 0, 0, 0], "fine": [8, 0, 0, 0, 0]}}
-        (self.trip.path / "map" / "config.json").write_text(json.dumps(config), encoding="utf-8")
+        self.write_record("map/config.json", config)
         problems = checks.run_check(self.root, TODAY)[0]
         # 紀錄有問題時不另外跑地圖頁的 --check（同樣的問題不報兩次）
         self.assertEqual(problems, [f"trips/{self.trip.slug}/places/temple.json：categories[0]：類別 sight 沒有定義在 map/config.json 的 categories"])
-        self.assertEqual([g[0] for g in build.generators(self.root)], [f"seasoningway.tripmap.build trips/{self.trip.slug}"])
 
 
 if __name__ == "__main__":
