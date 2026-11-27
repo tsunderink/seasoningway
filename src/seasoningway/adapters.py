@@ -1,4 +1,5 @@
 """建立資料 repo，並從同一份流程產生各工具的轉接檔。"""
+import errno
 import json
 import os
 import re
@@ -40,6 +41,8 @@ AGENTS = {
     ),
 }
 SKILL_DIRS = (".agents/skills", ".claude/skills")
+ADAPTER_DIRS = (".claude/agents", ".codex/agents", ".githooks", *SKILL_DIRS)
+ADAPTER_FILES = ("AGENTS.md", "CLAUDE.md", ".github/workflows/check.yml", *HOOK_FILES.values())
 ENGINE_LINE = re.compile(
     r"""(?m)^([ \t]*(?:engine|"engine"|'engine')[ \t]*=[ \t]*)(?:"(?:\\.|[^"\\\n])*"|'[^'\n]*')(?=[ \t]*(?:#|$))"""
 )
@@ -63,13 +66,16 @@ def hook_settings(tool: str) -> dict:
         hooks[name] = [entry]
     if tool == "codex":
         return {"description": GENERATED, "hooks": hooks}
-    return {"permissions": {"deny": [
-        "mcp__claude-in-chrome__*",
-        "mcp__Claude_Browser__*",
-        "mcp__computer-use__*",
-        "mcp__remote-devices__Claude_Browser*",
-        "mcp__remote-devices__computer*",
-    ]}, "hooks": hooks}
+    return {"permissions": {
+        "allow": ["Bash(seasoningway:*)"],
+        "deny": [
+            "mcp__claude-in-chrome__*",
+            "mcp__Claude_Browser__*",
+            "mcp__computer-use__*",
+            "mcp__remote-devices__Claude_Browser*",
+            "mcp__remote-devices__computer*",
+        ],
+    }, "hooks": hooks}
 
 
 def template(resource: str, **values: str) -> str:
@@ -110,13 +116,12 @@ def adapter_files(engine: str) -> dict[str, str]:
 
 def adapter_path(rel: str) -> bool:
     """這些路徑由 init、upgrade 維護，也保護資料 repo 過去產生的同類轉接檔。"""
-    rules = ("AGENTS.md", "CLAUDE.md")
     if os.name == "nt":
         rel = rel.lower()
-        rules = ("agents.md", "claude.md")
-    return rel in (*rules, ".github/workflows/check.yml", *HOOK_FILES.values()) or rel.startswith(
-        (".claude/agents/", ".codex/agents/", ".githooks/", *(folder + "/" for folder in SKILL_DIRS))
-    )
+        files = tuple(name.lower() for name in ADAPTER_FILES)
+    else:
+        files = ADAPTER_FILES
+    return rel in files or rel.startswith(tuple(folder + "/" for folder in ADAPTER_DIRS))
 
 
 def project_files() -> dict[str, str]:
@@ -153,7 +158,49 @@ def adapter_updates(root: Path) -> dict[str, str]:
     return result
 
 
-def write_files(root: Path, updates: dict[str, str]) -> None:
+def obsolete_adapters(root: Path, updates: dict[str, str]) -> tuple[list[str], list[str]]:
+    current = {root / name for name in updates}
+    candidates = {root / name for name in ADAPTER_FILES}
+    for name in ADAPTER_DIRS:
+        folder = root / name
+        if folder.is_dir() and folder.resolve() == folder and not folder.is_symlink() and not folder.is_junction():
+            pending = [folder]
+            while pending:
+                for path in pending.pop().iterdir():
+                    if not (path.is_symlink() or path.is_junction()) and path.is_dir():
+                        pending.append(path)
+                    else:
+                        candidates.add(path)
+
+    obsolete, custom = [], []
+    marker = GENERATED.encode("utf-8")
+    for path in sorted(candidates - current):
+        name = path.relative_to(root).as_posix()
+        if path.is_symlink() or path.is_junction() or path.resolve() != path:
+            custom.append(name)
+        elif path.is_file():
+            (obsolete if marker in path.read_bytes() else custom).append(name)
+    return obsolete, custom
+
+
+def prune_adapter_dirs(root: Path, obsolete: list[str]) -> None:
+    directories = set()
+    for name in obsolete:
+        for parent in Path(name).parents:
+            rel = parent.as_posix()
+            if rel in ADAPTER_DIRS or adapter_path(rel):
+                directories.add(root / parent)
+    for directory in sorted(directories, reverse=True):
+        if directory.resolve() != directory or directory.is_symlink() or directory.is_junction():
+            continue
+        try:
+            directory.rmdir()
+        except OSError as error:
+            if error.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
+                raise
+
+
+def write_files(root: Path, updates: dict[str, str], *, remove: tuple[str, ...] = ()) -> None:
     with TemporaryDirectory(prefix=".seasoningway-adapters-", dir=root) as folder:
         stage = Path(folder)
         paths = {}
@@ -164,7 +211,7 @@ def write_files(root: Path, updates: dict[str, str]) -> None:
             if name.startswith(".githooks/"):
                 source.chmod(0o755)
             paths[source] = target
-        replace_paths(stage, paths)
+        replace_paths(stage, paths, remove=[safe_destination(root, name) for name in remove])
 
 
 def initialize_git(root: Path) -> None:
@@ -231,8 +278,14 @@ def cmd_upgrade(args, root: Path, today) -> int:
     if error := git_repo_problem(root):
         raise Problem(error)
     updates = adapter_updates(root)
+    obsolete, custom = obsolete_adapters(root, updates)
     updates[CONFIG] = upgrade_config(path.read_text(encoding="utf-8"))
-    write_files(root, updates)
+    write_files(root, updates, remove=tuple(obsolete))
+    for name in obsolete:
+        print(f"已刪除舊轉接檔：{name}")
+    prune_adapter_dirs(root, obsolete)
+    for name in custom:
+        print(f"提醒：保留自訂轉接檔 {name}")
     cmd_migrate(args, root, today)
     configure_git(root)
     print(f"已更新為引擎 {__version__}，請執行 seasoningway save 保存。")

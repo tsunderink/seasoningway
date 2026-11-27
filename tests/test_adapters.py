@@ -81,11 +81,18 @@ class AdapterTest(DataRepoTest):
             with self.subTest(name=name):
                 self.assertIn(GENERATED, path.read_text(encoding="utf-8"))
                 self.assertNotIn(b"\r\n", path.read_bytes())
+        agents = (self.root / "AGENTS.md").read_text(encoding="utf-8")
+        for name, description in TOPICS.items():
+            self.assertTrue(description.endswith("時用。"), name)
+            self.assertIn(f"- {name}：{description}\n", agents)
         for folder in (".claude/skills", ".agents/skills"):
             self.assertEqual({path.name for path in (self.root / folder).iterdir()}, set(TOPICS))
-            for name in TOPICS:
-                self.assertIn(f"seasoningway guide {name}",
-                              (self.root / folder / name / "SKILL.md").read_text(encoding="utf-8"))
+            for name, description in TOPICS.items():
+                skill = (self.root / folder / name / "SKILL.md").read_text(encoding="utf-8")
+                self.assertIn(f"description: {description}\n", skill)
+                self.assertIn(f"seasoningway guide {name}", skill)
+        claude_settings = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(claude_settings["permissions"]["allow"], ["Bash(seasoningway:*)"])
         for agent, topic in (("spot-scout", "scout"), ("fact-checker", "recheck")):
             claude = (self.root / f".claude/agents/{agent}.md").read_text(encoding="utf-8")
             codex = tomllib.loads((self.root / f".codex/agents/{agent}.toml").read_text(encoding="utf-8"))
@@ -135,6 +142,43 @@ class AdapterTest(DataRepoTest):
         self.assertIn("$schema", json.loads((self.root / rel).read_text(encoding="utf-8")))
         self.assertEqual(custom.read_text(encoding="utf-8"), "# 自訂偏好\n")
         self.ok(self.cli("check"))
+
+    def test_upgrade_removes_obsolete_generated_skills_and_save_records_deletions(self):
+        self.initialize()
+        shutil.copytree(DEMO / "trips", self.root / "trips", dirs_exist_ok=True)
+        self.ok(self.cli("save"))
+        generated = f"<!-- {GENERATED} -->\n"
+        obsolete = (
+            ".claude/skills/obsolete/SKILL.md",
+            ".claude/skills/obsolete/references/rules.md",
+            ".agents/skills/example-custom/references/old.md",
+        )
+        for name in obsolete:
+            self.write(name, generated)
+        custom = ".agents/skills/example-custom/SKILL.md"
+        custom_text = "# 自訂 skill\n"
+        self.write(custom, custom_text)
+        outside = ".claude/commands/keep.md"
+        self.write(outside, generated)
+        self.ok(self.git("add", "--", *obsolete, custom, outside))
+        self.ok(self.git("commit", "-m", "加入虛構的舊轉接檔和自訂檔案"))
+
+        output = self.ok(self.cli("upgrade"))
+        for name in obsolete:
+            self.assertIn(f"已刪除舊轉接檔：{name}", output)
+            self.assertFalse((self.root / name).exists())
+        self.assertFalse((self.root / ".claude/skills/obsolete").exists())
+        self.assertFalse((self.root / ".agents/skills/example-custom/references").exists())
+        self.assertIn(f"保留自訂轉接檔 {custom}", output)
+        self.assertNotIn(outside, output)
+        self.assertEqual((self.root / custom).read_text(encoding="utf-8"), custom_text)
+        self.assertEqual((self.root / outside).read_text(encoding="utf-8"), generated)
+        self.assertNotIn("已刪除舊轉接檔", self.ok(self.cli("upgrade")))
+
+        self.ok(self.cli("save"))
+        deleted = self.ok(self.git("diff-tree", "--no-commit-id", "--name-only", "--diff-filter=D", "-r", "HEAD"))
+        self.assertEqual(set(deleted.splitlines()), set(obsolete))
+        self.assertEqual(self.ok(self.git("status", "--porcelain")), "")
 
     def test_refuses_to_overwrite_custom_file_and_avoids_initializing_nested_repo(self):
         self.write("AGENTS.md", "# 自訂規則\n")

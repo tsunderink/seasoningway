@@ -89,12 +89,12 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 ## 6. 各 agent 的轉接檔
 
-由 `init` 寫入資料 repo、`upgrade` 更新。檔頭標明「由 seasoningway 產生，不要手改」，`hook pre-edit` 擋直接修改。
+由 `init` 寫入資料 repo、`upgrade` 更新。檔頭標明「由 seasoningway 產生，不要手改」，`hook pre-edit` 擋直接修改。2026-11-27 起，`upgrade` 移除轉接檔路徑內有產生標記且新版不再產生的檔案和留下的空目錄，列出刪除的檔案與保留的自訂檔案。
 
 | 檔案 | 內容 |
 |---|---|
 | `AGENTS.md`、`CLAUDE.md` | 硬性規則（個資、只做規劃）、`render` 和 `save` 什麼時候用、`guide` 有哪些主題 |
-| `.claude/settings.json`、`.codex/hooks.json` | hook 都只呼叫 `seasoningway hook …` |
+| `.claude/settings.json`、`.codex/hooks.json` | hook 都只呼叫 `seasoningway hook …`。2026-11-27 起，Claude 預先允許執行 `seasoningway` 指令。 |
 | `.claude/skills/`、`.agents/skills/` | 薄入口：什麼時候用，以及執行 `seasoningway guide <主題>` |
 | `.claude/agents/`、`.codex/agents/` | subagent 定義。讀網頁的 subagent 沒有 shell，執行不了 `guide`，所以完整的做法要寫進定義檔 |
 | `.githooks/` | 呼叫 `seasoningway hook git <事件>`；`init`、`upgrade`、`status`、`save` 會設定 `core.hooksPath` |
