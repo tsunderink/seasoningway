@@ -20,6 +20,7 @@
 3. commit 訊息用 Conventional Commits，說明用繁體中文：`feat(cli): 實作 render`。範圍用模組名稱（`cli`、`render`、`save`、`schemas`、`tripmap`、`adapters`、`docs` 等）。
 4. push 分支、開 PR 到 `main`。審查和合併由 Claude 負責（使用者 2026-11-27 指定）：其他工具開的 PR 完成後請使用者交給 Claude，Claude 開的 PR 也由 Claude 在 CI 通過後合併。
 5. 完成 migration.md 的項目就在同一個 PR 裡打勾。
+6. 發新版：在 PR 裡改 `src/seasoningway/__init__.py` 的 `__version__`（semver，design.md 第 7 節）。合併後 main 的 CI 通過時，`.github/workflows/release.yml` 自動建立標籤和 Release。
 
 ## 文件
 
