@@ -3,6 +3,7 @@ import contextlib
 import io
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from datetime import date
 from pathlib import Path
@@ -10,6 +11,7 @@ from unittest import mock
 
 from fixture_project import seed_project
 from seasoningway import __version__, cli, gitops
+from seasoningway.config import FORMAT
 
 TODAY = date(2098, 11, 1)
 SLUG = "2099-01-example-city"
@@ -218,6 +220,42 @@ class SaveTest(unittest.TestCase):
         self.assertIn(SLUG, output)
         self.assertEqual(self.git(self.root, "rev-parse", "HEAD"), remote)
         self.assertEqual(self.git(self.root, "config", "core.hooksPath"), ".githooks")
+
+    def pin_old_engine(self):
+        self.edit_config(f'engine = "{__version__}"', 'engine = "0.0.1"')
+        self.edit_config(f"format = {FORMAT}", f"format = {FORMAT - 1}")
+        self.git(self.root, "commit", "-am", "指定舊引擎")
+        self.git(self.root, "push", "origin", "main")
+
+    def test_status_auto_upgrades_to_newer_released_engine_and_saves(self):
+        self.remote("main")
+        self.pin_old_engine()
+        with mock.patch("seasoningway.status.editable_install", return_value=False):
+            output = self.ok("status")
+        self.assertIn(f"已自動把資料 repo 從引擎 0.0.1 升級到 {__version__} 並保存", output)
+        self.assertNotIn("指定引擎", output)
+        config = tomllib.loads((self.root / "seasoningway.toml").read_text(encoding="utf-8"))
+        self.assertEqual((config["engine"], config["format"]), (__version__, FORMAT))
+        self.assertIn(f"uses: tsunderink/seasoningway@v{__version__}",
+                      (self.root / ".github/workflows/check.yml").read_text(encoding="utf-8"))
+        self.assertEqual(self.git(self.root, "status", "--porcelain"), "")
+        self.assertEqual(self.git(self.origin, "rev-parse", "main"), self.git(self.root, "rev-parse", "HEAD"))
+        self.assertIn(f"升級引擎到 {__version__}", self.git(self.root, "log", "-1", "--format=%B"))
+        with mock.patch("seasoningway.status.editable_install", return_value=False):
+            self.assertNotIn("自動", self.ok("status"))  # 已是最新，不再升級
+
+    def test_status_skips_auto_upgrade_for_dev_install_or_dirty_worktree(self):
+        self.remote("main")
+        self.pin_old_engine()
+        head = self.git(self.root, "rev-parse", "HEAD")
+        with mock.patch("seasoningway.status.editable_install", return_value=True):
+            self.assertIn("指定引擎 0.0.1", self.failure("status"))  # 格式還是舊的
+        self.write("profile/local.md", "# 未保存的資料\n")
+        with mock.patch("seasoningway.status.editable_install", return_value=False):
+            output = self.failure("status")
+        self.assertIn(f"還沒自動升級到引擎 {__version__}：工作區有未保存的改動", output)
+        self.assertEqual(self.git(self.root, "rev-parse", "HEAD"), head)
+        self.assertIn('engine = "0.0.1"', (self.root / "seasoningway.toml").read_text(encoding="utf-8"))
 
     def test_save_check_keeps_index_and_refs(self):
         self.remote("main")

@@ -18,7 +18,7 @@ pip install "git+https://github.com/tsunderink/seasoningway@<版本>"
 
 在新的空目錄執行 `seasoningway init`，再用 `seasoningway guide plan-trip` 完成設定。啟動 Claude Code 或 Codex 前，請確認該工具能從 `PATH` 執行 `seasoningway`。在 Codex 信任專案後到 `/hooks` 核准 hooks；需要手動執行時，開場用 `seasoningway status`，收尾用 `seasoningway save --check`。
 
-換用新版引擎時，先安裝目標版本，再到資料 repo 執行 `seasoningway upgrade` 和 `seasoningway save`。
+換用新版引擎時，安裝目標版本即可：下次開 session（或執行 `seasoningway status`）時，若安裝的版本比 `seasoningway.toml` 的 `engine` 新，會自動升級並保存（[設計第 7 節](docs/design.md#7-版本)）。也可以手動執行 `seasoningway upgrade` 和 `seasoningway save`。
 
 ## 從舊模板遷移
 

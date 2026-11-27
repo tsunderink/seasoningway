@@ -268,7 +268,8 @@ def upgrade_config(text: str) -> str:
     raise Problem(f'{CONFIG}：請將 engine 設定整理為一行 engine = "X.Y.Z" 後再升級')
 
 
-def cmd_upgrade(args, root: Path, today) -> int:
+def upgrade_repo(args, root: Path, today) -> None:
+    """更新轉接檔、engine 版本並遷移資料；不保存。"""
     path = safe_destination(root, CONFIG)
     if not path.is_file():
         raise Problem(f"找不到 {CONFIG}：請先執行 seasoningway init")
@@ -288,5 +289,9 @@ def cmd_upgrade(args, root: Path, today) -> int:
         print(f"提醒：保留自訂轉接檔 {name}")
     cmd_migrate(args, root, today)
     configure_git(root)
+
+
+def cmd_upgrade(args, root: Path, today) -> int:
+    upgrade_repo(args, root, today)
     print(f"已更新為引擎 {__version__}，請執行 seasoningway save 保存。")
     return 0
