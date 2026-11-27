@@ -1,0 +1,50 @@
+{
+  "rates": [
+    {
+      "currency": "JPY",
+      "rate": 0.21,
+      "as_of": "2098-11-10",
+      "source": {
+        "url": "https://example.com/fx"
+      }
+    }
+  ],
+  "items": [
+    {
+      "category": "住宿",
+      "item": "範例飯店 A 雙人房",
+      "unit_amount": 18000,
+      "currency": "JPY",
+      "qty": 2,
+      "status": "預估",
+      "as_of": "2098-11-10",
+      "source": {
+        "url": "https://example.com/hotel"
+      },
+      "note": "第一、二晚"
+    },
+    {
+      "category": "交通",
+      "item": "機票來回",
+      "unit_amount": 9000,
+      "currency": "TWD",
+      "scope": "每人",
+      "status": "預估",
+      "as_of": "2098-11-10",
+      "source": {
+        "url": "https://example.com/flight"
+      }
+    },
+    {
+      "category": "餐飲",
+      "item": "每日餐費概算",
+      "unit_amount": 5000,
+      "currency": "JPY",
+      "qty": 5,
+      "scope": "每人",
+      "status": "預估",
+      "as_of": "2098-11-10",
+      "note": "午餐加晚餐"
+    }
+  ]
+}

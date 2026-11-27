@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "預訂清單：trips/<旅程>/bookings.json",
+  "description": "使用者自己預訂，這裡只記狀態和建議預訂時間；沒有欄位放訂位代號、確認碼、付款資訊。產生 bookings.md。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "note": {
+      "$ref": "common.schema.json#/$defs/text",
+      "description": "各項共通的條件（例如平台的扣款、取消規則），寫一次放在清單上方"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "item", "status"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "item": {"$ref": "common.schema.json#/$defs/text", "description": "要訂什麼"},
+          "date": {"$ref": "common.schema.json#/$defs/date", "description": "使用的第一天；已訂清單依它排"},
+          "status": {"enum": ["待訂", "看需要", "已訂", "不需要"]},
+          "status_note": {"$ref": "common.schema.json#/$defs/text", "description": "狀態的補充：取消期限、付款方式、候選在哪"},
+          "when": {"$ref": "common.schema.json#/$defs/text", "description": "建議預訂時間：開賣、截止"},
+          "book_on": {
+            "$ref": "common.schema.json#/$defs/date",
+            "description": "打算哪天訂（開賣日或建議的日子）；待訂清單依它排，沒寫的排最前面（盡早）"
+          },
+          "platform": {"$ref": "common.schema.json#/$defs/text", "description": "在哪訂；已訂但還不知道的不寫，清單上顯示（待補）"},
+          "note": {"$ref": "common.schema.json#/$defs/text"}
+        }
+      }
+    }
+  }
+}

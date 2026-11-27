@@ -2,7 +2,9 @@ import contextlib
 import io
 import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from seasoningway import __version__, cli
 
@@ -42,6 +44,29 @@ class CliTest(unittest.TestCase):
         r = subprocess.run([sys.executable, "-m", "seasoningway", "--version"], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0)
         self.assertIn(__version__, r.stdout)
+
+    def test_commands_on_a_new_data_repo(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (root / "README.md").write_text("# 自訂說明\n", encoding="utf-8")
+
+        def invoke(cwd: Path, *args: str) -> str:
+            result = subprocess.run([sys.executable, "-m", "seasoningway", *args], cwd=cwd,
+                                    capture_output=True, encoding="utf-8", timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            return result.stdout
+
+        invoke(root, "migrate")
+        slug = "2099-02-elsewhere"
+        invoke(root, "new", slug, "--title", "範例旅程", "--currency", "TWD", "--travelers", "2")
+        trip = root / "trips" / slug
+        self.assertIn("範例旅程", (trip / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("TWD", invoke(trip / "research", "budget", slug))
+        self.assertIn("check 通過", invoke(trip, "check"))
+        self.assertIn("check 通過", invoke(trip, "--root", str(root), "check"))
+        invoke(trip, "published", f"trips/{slug}", "v1", "--slug", "example", "--include", "budget.md")
+        self.assertTrue((trip / "published.json").is_file())
+        self.assertEqual((root / "README.md").read_text(encoding="utf-8"), "# 自訂說明\n")
+        self.assertFalse((root / "data").exists())
 
 
 if __name__ == "__main__":

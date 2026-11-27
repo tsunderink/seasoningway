@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "地點：trips/<旅程>/places/<id>.json",
+  "description": "景點、餐廳、住宿、租車點，一筆一檔、檔名就是 id。事實附來源，整筆的查詢日期是 as_of。地圖頁（seasoningway.tripmap）讀這些檔。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "region", "location", "categories", "summary", "as_of"],
+  "anyOf": [{"required": ["sources"]}, {"required": ["ratings"]}],
+  "properties": {
+    "id": {"$ref": "common.schema.json#/$defs/place_id"},
+    "name": {"type": "string", "minLength": 1, "description": "繁體中文名稱；只有原文、沒有通用中文寫法的照原文"},
+    "local_name": {"type": "string", "minLength": 1, "description": "當地語言的原文名稱（日文、韓文…）；和 name 一樣就不寫"},
+    "short_name": {"type": "string", "minLength": 1, "description": "地圖上的標籤；沒寫＝name 去掉括號"},
+    "region": {
+      "type": "string",
+      "minLength": 1,
+      "description": "所在的一級行政區（縣、州、省），清單依它分組；跨區的寫「A・B」，歸到 A"
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lat", "lon"],
+      "properties": {
+        "lat": {"type": "number", "minimum": -90, "maximum": 90, "description": "緯度"},
+        "lon": {"type": "number", "minimum": -180, "maximum": 180, "description": "經度"},
+        "approximate": {"const": true, "description": "座標是估的（地圖頁標「大概位置」）"}
+      }
+    },
+    "categories": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9_]+$", "x-ref": "category"},
+      "description": "類別代號，第一個是主要類別；代號定義在地圖設定 map/config.json 的 categories。base＝住宿基地（城市、溫泉鄉、旅館），car＝租車取還車點"
+    },
+    "summary": {"$ref": "common.schema.json#/$defs/text", "description": "一句話介紹"},
+    "detail": {"$ref": "common.schema.json#/$defs/text", "description": "補充"},
+    "season": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "旅行月份的評估（月份寫在地圖設定的 season.label）；和整年的口碑分開看",
+      "properties": {
+        "tier": {"type": "integer", "minimum": 1, "maximum": 5, "description": "推薦度，每級的意思在地圖設定的 season.tiers（5＝最值得專程去）；規劃助理的評估"},
+        "why": {"$ref": "common.schema.json#/$defs/text", "description": "推薦度的理由"},
+        "note": {"$ref": "common.schema.json#/$defs/text", "description": "旅行月份會遇到的狀況：休業、封路、天候、季節活動"}
+      },
+      "dependentRequired": {"tier": ["why"]}
+    },
+    "facts": {
+      "type": "array",
+      "description": "營業時間、休息、費用等；營業時間、公休以官網為準",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "value"],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "項目，括號寫出處，例如「營業（官網）」；公休的項目用「休息」開頭，週幾寫「週二」或原文「火曜定休」、日期寫 YYYY-MM-DD（plan_drive.py 才比對得到）"
+          },
+          "value": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "公開的店家資料（出自這筆的來源）。電話、地址只能放這裡，筆記和其他欄位不放",
+      "properties": {
+        "address": {"type": "string", "minLength": 1},
+        "phone": {"type": "string", "pattern": "^\\+?[0-9][0-9 ()-]{5,}$"}
+      }
+    },
+    "website": {
+      "type": "string",
+      "pattern": "^https?://",
+      "description": "景點、店家、旅館自己經營的網站首頁；比價、訂房、旅遊情報網站不算。卡片的資料來源第一個列它"
+    },
+    "ratings": {
+      "type": "array",
+      "description": "評分網站上的分數，一個分數一項；網站代號和顯示方式定義在地圖設定的 ratings",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["site"],
+        "anyOf": [{"required": ["url"]}, {"required": ["note"]}],
+        "dependentRequired": {"score": ["scale"]},
+        "properties": {
+          "site": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "評分網站代號，例如 jalan、tabelog、google"},
+          "kind": {"type": "string", "minLength": 1, "description": "同一個網站有好幾種分數時，這是哪一種（例如「編輯評級」「訪客」）"},
+          "name": {"type": "string", "minLength": 1, "description": "網站上的名稱；和地點名稱不同時卡片會列出"},
+          "score": {
+            "type": ["number", "string"],
+            "minLength": 1,
+            "description": "分數；只讀到範圍、約略值時寫文字，例如「3.55–3.62」"
+          },
+          "scale": {"type": "number", "exclusiveMinimum": 0, "description": "滿分"},
+          "label": {"type": "string", "minLength": 1, "description": "網站給的等級名稱，例如 Highly Recommended"},
+          "reviews": {"type": ["integer", "string"], "minimum": 0, "minLength": 1, "description": "評論數；只讀到約略值時寫文字"},
+          "url": {"type": "string", "pattern": "^https?://"},
+          "note": {"$ref": "common.schema.json#/$defs/text", "description": "補充，例如百名店、只讀自搜尋摘要"}
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "這筆的資料來源；評分頁另外寫在 ratings",
+      "items": {"$ref": "common.schema.json#/$defs/source"}
+    },
+    "visit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max", "note", "sources", "as_of"],
+      "description": "預計停留時間（分鐘），含排隊、買票、從停車場走過去，不含交通；有自己的來源和查詢日期",
+      "properties": {
+        "min": {"type": "integer", "minimum": 1},
+        "max": {"type": "integer", "minimum": 1},
+        "note": {
+          "$ref": "common.schema.json#/$defs/text",
+          "description": "來源怎麼說，規劃助理依旅行月份怎麼調整；沒有公開的建議時間就以「沒有找到公開的建議時間」開頭，使用者定的寫「使用者定的時間」和日期"
+        },
+        "sources": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/source"}},
+        "as_of": {"$ref": "common.schema.json#/$defs/as_of"}
+      }
+    },
+    "lodging": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["area"],
+      "description": "具體的旅館（使用者說了名字才加）；categories 只能是 [\"base\"]、不評推薦度",
+      "properties": {
+        "area": {"type": "string", "minLength": 1, "description": "所在的溫泉鄉或城市"}
+      }
+    },
+    "rental": {"enum": ["pickup", "dropoff"], "description": "租車的取車點或還車點（categories 是 [\"car\"]）；開車路線只算兩者之間"},
+    "map_query": {
+      "description": "地圖 App 搜尋這個點用的文字。沒寫＝原文名稱去掉括號＋地區；名稱有兩個地方、太長時指定；泛指一類的店、列車這種搜不到特定地點的寫 false（改用座標）",
+      "oneOf": [{"type": "string", "minLength": 1}, {"const": false}]
+    },
+    "unconfirmed": {
+      "type": "array",
+      "items": {"$ref": "common.schema.json#/$defs/text"},
+      "description": "查不到可靠來源的事，寫明缺什麼"
+    },
+    "as_of": {
+      "$ref": "common.schema.json#/$defs/as_of",
+      "description": "整筆的查詢日期：來源都重新對過才改，只改規劃助理的評估（推薦度）時不改。行程（itinerary.json）用到的點過期了，check 提醒重查"
+    }
+  },
+  "allOf": [
+    {
+      "if": {"required": ["lodging"]},
+      "then": {
+        "properties": {
+          "categories": {"const": ["base"]},
+          "season": {"not": {"required": ["tier"]}}
+        }
+      }
+    },
+    {
+      "if": {"required": ["rental"]},
+      "then": {"properties": {"categories": {"const": ["car"]}}}
+    },
+    {
+      "if": {
+        "properties": {"categories": {"not": {"contains": {"enum": ["base", "car"]}}}},
+        "required": ["categories"]
+      },
+      "then": {
+        "required": ["season"],
+        "properties": {"season": {"required": ["tier", "why"]}}
+      }
+    }
+  ]
+}
