@@ -188,9 +188,10 @@ class SaveTest(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 1, "", "fatal: Could not resolve host: example.invalid")
             return real(root, *args)
 
-        with mock.patch.object(gitops, "run_git", side_effect=failing_push) as git, mock.patch.object(gitops.time, "sleep") as sleep:
+        with mock.patch.object(gitops, "run_git", side_effect=failing_push) as git, mock.patch.object(gitops, "time") as clock:
+            # 只換掉 gitops 的 time：subprocess 等子程序結束時也會呼叫 time.sleep，全域替換會把那些也算進來。
             self.assertIn("Could not resolve host", self.failure("save"))
-        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2, 4, 8])
+        self.assertEqual([call.args[0] for call in clock.sleep.call_args_list], [1, 2, 4, 8])
         self.assertEqual(sum(call.args[1] == "push" for call in git.call_args_list), 5)
         self.assertIn("還沒推到 origin/main", self.failure("save", "--check"))
         self.assertEqual(self.git(self.origin, "rev-parse", "main"), initial)
