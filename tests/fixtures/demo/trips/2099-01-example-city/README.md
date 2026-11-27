@@ -30,7 +30,7 @@ budget_target: 60000
 
 ## 下一步
 
-- 使用者 2098-11-20 前訂第一、二晚的住宿（[bookings.md](bookings.json)）
+- 使用者 2098-11-20 前訂第一、二晚的住宿（[bookings.json](bookings.json)）
 - Claude 重查住宿候選的房價再比較
 
 ## 檔案

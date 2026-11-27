@@ -87,10 +87,12 @@ def upgrade_v4(root: Path) -> list[str]:
             text = path.read_text(encoding="utf-8")
             new = text.replace("seasoningway build", "seasoningway render")
             for name in converted_views:
-                if path.parent == trip:
-                    new = new.replace(f"]({name})", f"]({Path(name).stem}.json)")
-                elif path.parent.parent == trip:
-                    new = new.replace(f"](../{name})", f"](../{Path(name).stem}.json)")
+                record = f"{Path(name).stem}.json"
+                prefix = "" if path.parent == trip else "../" if path.parent.parent == trip else None
+                if prefix is None:
+                    continue
+                new = new.replace(f"[{name}]({prefix}{name})", f"[{record}]({prefix}{record})")  # 檔名當連結文字的一起改
+                new = new.replace(f"]({prefix}{name})", f"]({prefix}{record})")
             if new != text:
                 updates[path] = new
     changed = []
