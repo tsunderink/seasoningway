@@ -63,6 +63,64 @@ async function savedPlans(browser, url) {
   return { local, remote: fromDb, newerLocal, fallback, fallbackWrites };
 }
 
+async function transferPlan(browser, url) {
+  const source = await browser.newContext({ viewport: SIZES.desktop });
+  await routeLeaflet(source);
+  await source.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('Clipboard unavailable'); } } });
+    const days = { '2099-01-04': { ids: ['temple', 'garden'], stay: 'inn' }, '2099-01-05': { ids: [], stay: 'inn' } };
+    localStorage.setItem('test-plan', JSON.stringify({ days }));
+  });
+  const original = await source.newPage();
+  await original.goto(url, { waitUntil: 'domcontentloaded' });
+  const sourceCards = await planCards(original);
+  await original.getByRole('button', { name: '匯出行程', exact: true }).click();
+  const fallback = original.getByRole('textbox', { name: '行程字串' });
+  await fallback.waitFor();
+  const code = await fallback.inputValue();
+  await source.close();
+
+  const target = await browser.newContext({ viewport: SIZES.phone });
+  try {
+    await routeLeaflet(target);
+    const page = await target.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    const before = await planCards(page);
+    const open = () => page.getByRole('button', { name: '匯入行程', exact: true }).click();
+    const input = page.getByRole('textbox', { name: '貼上行程字串' });
+    const submit = async value => {
+      await input.fill(value);
+      await page.getByRole('button', { name: '覆蓋行程' }).click();
+    };
+    const replaceCode = change => {
+      const payload = JSON.parse(code.slice('SWP1:'.length));
+      change(payload);
+      return 'SWP1:' + JSON.stringify(payload);
+    };
+    await open();
+    await submit('SWP1:{');
+    const malformed = await page.getByRole('alert').innerText();
+    await submit(replaceCode(payload => { payload.trip[0] = 'other-trip'; }));
+    const otherTrip = await page.getByRole('alert').innerText();
+    await submit(replaceCode(payload => { payload.days['2099-01-04'].ids.push('missing-spot'); }));
+    const missing = await page.getByRole('alert').innerText();
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    const rejected = await planCards(page);
+    await open();
+    await submit('  ' + code + '\n');
+    const imported = await planCards(page);
+    await page.getByRole('button', { name: '復原' }).click();
+    const undone = await planCards(page);
+    await open();
+    await submit(code);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    return { sourceCards, oneLine: code.startsWith('SWP1:') && !code.includes('\n'), before, malformed,
+      otherTrip, missing, rejected, imported, undone, reloaded: await planCards(page) };
+  } finally {
+    await target.close();
+  }
+}
+
 (async () => {
   const browser = await launch();
   const url = pathToFileURL(process.argv[2]).href;
@@ -89,6 +147,7 @@ async function savedPlans(browser, url) {
     await ctx.close();
   }
   out.desktop.saved = await savedPlans(browser, url);
+  out.desktop.transfer = await transferPlan(browser, url);
   await browser.close();
   console.log(JSON.stringify(out));
 })().catch(e => { console.log(JSON.stringify({ error: String(e) })); process.exit(1); });

@@ -193,6 +193,7 @@ class MapTest(unittest.TestCase):
         """模板的 JS 只有這裡測：桌面、手機尺寸各開一次，切三個分頁、收合地圖（只有手機有），不能有 JS 錯誤。
         要 Node 的 playwright 和 leaflet 套件。CI 設 SEASONINGWAY_BROWSER_TEST=require，缺了就算失敗。"""
         self.write_map_inputs()
+        self.write("places/garden.json", place("garden"))
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(cli.main(["render", self.slug], root=self.root, today=self.today), 0)
         result = browse(self.root / "out" / self.slug / "map/index.html")
@@ -221,6 +222,17 @@ class MapTest(unittest.TestCase):
         self.assertEqual(saved["newerLocal"], {"stops": [], "stays": []})
         self.assertEqual(saved["fallback"], result["desktop"]["plan"])
         self.assertEqual(saved["fallbackWrites"], 0)
+        transfer = result["desktop"]["transfer"]
+        self.assertTrue(transfer["oneLine"])
+        self.assertIn("完整字串", transfer["malformed"])
+        self.assertIn("目前地圖不符", transfer["otherTrip"])
+        self.assertIn("缺少行程中的地點", transfer["missing"])
+        for unchanged in ("rejected", "undone"):
+            self.assertEqual(transfer[unchanged], transfer["before"])
+        self.assertEqual(transfer["sourceCards"], {"stops": [["3", "temple"], ["3", "garden"]],
+                                                    "stays": [["3", "inn"], ["4", "inn"]]})
+        for restored in ("imported", "reloaded"):
+            self.assertEqual(transfer[restored], transfer["sourceCards"])
 
     def test_dates_text(self):
         self.assertEqual(render.dates_text("2099-01-03", "2099-01-08"), "2099 年 1 月 3 日至 8 日，共 6 天。")
