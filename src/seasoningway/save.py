@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from . import __version__
+from .adapters import GIT_EVENTS, adapter_files, adapter_path, project_files
 from .checks import print_issues, run_check
 from .common import CONFIG, OUT, TRIPS, Problem
 from .config import config_problems, engine_warning
@@ -50,7 +52,17 @@ def names(text: str) -> set[str]:
 
 
 def data_path(path: str) -> bool:
-    return path == CONFIG or path.startswith((f"{TRIPS}/", "profile/"))
+    return path in (CONFIG, "wishlist.md") or path.startswith((f"{TRIPS}/", "profile/"))
+
+
+def bootstrap_paths(root: Path, paths: set[str]) -> set[str]:
+    """允許 init、upgrade 新增的原版轉接檔和初始化用的 Git 設定檔。"""
+    candidates = {p for p in paths if adapter_path(p) or p in (".gitignore", ".gitattributes")}
+    if not candidates:
+        return set()
+    expected = {**project_files(), **adapter_files(__version__)}
+    return {p for p in candidates if p in expected and (root / p).is_file() and not (root / p).is_symlink()
+            and (root / p).read_text(encoding="utf-8") == expected[p]}
 
 
 def new_paths(root: Path) -> set[str]:
@@ -63,7 +75,7 @@ def check_paths(root: Path) -> set[str]:
     if checked_git(root, "ls-files", "-z", "--", OUT):
         raise Problem(f"{OUT}/ 有已追蹤的產物：請先從 Git 索引移除並保留本地檔案")
     paths = new_paths(root)
-    outside = sorted(path for path in paths if not data_path(path))
+    outside = sorted({path for path in paths if not data_path(path)} - bootstrap_paths(root, paths))
     if outside:
         raise Problem("資料路徑外有新檔，請移到資料路徑內或加到 .gitignore：\n" + "\n".join(outside))
     return paths
@@ -92,10 +104,17 @@ def commit_message(paths: set[str], note: str | None) -> str:
 
 
 def commit_changes(root: Path, paths: set[str], note: str | None) -> bool:
-    checked_git(root, "add", "-u", "--", ".")
+    checked_git(root, "add", "-u")
     existing = sorted(path for path in paths if (root / path).exists() or (root / path).is_symlink())
     if existing:
         checked_git(root, "--literal-pathspecs", "add", "--", *existing)
+    if (root / ".githooks").is_dir():
+        hooks = (f".githooks/{name}" for name in GIT_EVENTS)
+        entries = checked_git(root, "ls-files", "--stage", "-z", "--", *hooks)
+        # Windows 的 chmod 不會把執行權寫進 Git，明確更新索引供其他平台使用。
+        scripts = [entry.split("\t", 1)[1] for entry in entries.split("\0") if entry.startswith("100644 ")]
+        if scripts:
+            checked_git(root, "update-index", "--chmod=+x", "--", *scripts)
     staged = names(checked_git(root, "diff", "--cached", "--name-only", "--no-renames", "-z"))
     if not staged:
         return False

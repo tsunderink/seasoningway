@@ -44,13 +44,13 @@
 
 完成時：在空目錄執行 `init` 會產生一個可以用的資料 repo，Claude Code 和 Codex 開在裡面時 hook 都會跑。
 
-- [ ] `guide <主題>`：舊的 `.agents/skills/*/` 改寫成 `src/seasoningway/guides/`，主題名稱沿用 skill 的名稱。
-- [ ] `hook claude|codex <事件>`：搬 `core/hooks.py`，事件有 `session-start`（呼叫 `status`）、`pre-edit`、`post-edit`、`stop`（呼叫 `save --check`）。`AGENT_WRITES` 改用新路徑，並擋直接修改轉接檔。
-- [ ] `hook git pre-commit|pre-push`：pre-commit 跑 `check`；pre-push 掃新增的行和 commit 訊息裡的個資。
-- [ ] 轉接檔的範本（design.md 第 6 節）。資料 repo 的 `AGENTS.md` 從舊的 `AGENTS.md` 取資料 repo 也適用的部分：個資、只做規劃、事實來源、研究與引用、金額與預算、偏好與心得、語言與命名。git 的手動步驟改成「改完執行 `seasoningway save`」。
-- [ ] subagent 定義：搬 `.claude/agents/`、`.codex/agents/`，沒有 shell 的 subagent 要把 guide 的完整內容寫進定義檔。
-- [ ] `init`、`upgrade`：寫入或更新轉接檔，`upgrade` 另外改 `engine` 版本和 CI 的 `uses:` 版本，再跑 `migrate`。
-- [ ] `action.yml` 能用：在 `tests/fixtures/demo` 上跑通。
+- [x] `guide <主題>`：舊的 `.agents/skills/*/` 改寫成 `src/seasoningway/guides/`，主題名稱沿用 skill 的名稱。
+- [x] `hook claude|codex <事件>`：搬 `core/hooks.py`，事件有 `session-start`（呼叫 `status`）、`pre-edit`、`post-edit`、`stop`（呼叫 `save --check`）。`AGENT_WRITES` 改用新路徑，並擋直接修改轉接檔。
+- [x] `hook git pre-commit|pre-push`：pre-commit 跑 `check`；pre-push 掃新增的行和 commit 訊息裡的個資。
+- [x] 轉接檔的範本（design.md 第 6 節）。資料 repo 的 `AGENTS.md` 從舊的 `AGENTS.md` 取資料 repo 也適用的部分：個資、只做規劃、事實來源、研究與引用、金額與預算、偏好與心得、語言與命名。git 的手動步驟改成「改完執行 `seasoningway save`」。
+- [x] subagent 定義：搬 `.claude/agents/`、`.codex/agents/`，沒有 shell 的 subagent 要把 guide 的完整內容寫進定義檔。
+- [x] `init`、`upgrade`：寫入或更新轉接檔，`upgrade` 另外改 `engine` 版本和 CI 的 `uses:` 版本，再跑 `migrate`。
+- [x] `action.yml` 能用：在 `tests/fixtures/demo` 上跑通。
 
 ## 第 4 階段：從舊的模板 repo 搬過來
 

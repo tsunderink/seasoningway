@@ -1,11 +1,13 @@
 # 資料 repo 的 CI 用：uses: tsunderink/seasoningway@<版本>，版本和 seasoningway.toml 的 engine 一致（upgrade 會一起改）。
-# 骨架階段 check 還沒實作，第 3 階段完成後才能用（docs/migration.md）。
 name: seasoningway check
 description: 用指定版本的 seasoningway 檢查旅程資料 repo
 inputs:
   python-version:
     description: Python 版本
     default: "3.13"
+  root:
+    description: 資料 repo 的根目錄
+    default: "."
 runs:
   using: composite
   steps:
@@ -13,6 +15,10 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
     - shell: bash
-      run: pip install "${{ github.action_path }}"
+      run: python -m pip install "$SEASONINGWAY_ACTION_PATH"
+      env:
+        SEASONINGWAY_ACTION_PATH: ${{ github.action_path }}
     - shell: bash
-      run: seasoningway check
+      run: seasoningway --root "$SEASONINGWAY_DATA_ROOT" check
+      env:
+        SEASONINGWAY_DATA_ROOT: ${{ inputs.root }}

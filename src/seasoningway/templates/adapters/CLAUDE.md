@@ -1,0 +1,2 @@
+<!-- {{generated}} -->
+@AGENTS.md
