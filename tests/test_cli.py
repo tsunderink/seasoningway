@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from fixture_project import seed_project
 from seasoningway import __version__, cli
+from seasoningway.guides import TOPICS
 
 
 def run(*argv: str) -> tuple[int, str, str]:
@@ -29,17 +29,17 @@ class CliTest(unittest.TestCase):
     def test_help_lists_every_command(self):
         code, out, _ = run()
         self.assertEqual(code, 0)
-        for name, _, _ in cli.COMMANDS:
+        for name, _ in cli.COMMANDS:
             self.assertIn(name, out)
 
-    def test_unimplemented_command_points_to_migration_stage(self):
-        code, _, err = run("guide", "scout")
+    def test_guide_lists_available_topics_and_rejects_unknown(self):
+        code, out, _ = run("guide", "--help")
+        self.assertEqual(code, 0)
+        for name in TOPICS:
+            self.assertIn(name, out)
+        code, _, err = run("guide", "example")
         self.assertEqual(code, 2)
-        self.assertIn("docs/migration.md 第 3 階段", err)
-
-    def test_every_command_has_a_stage(self):
-        for name, _, stage in cli.COMMANDS:
-            self.assertIn(stage, (1, 2, 3), name)
+        self.assertIn("example", err)
 
     def test_module_entry_point(self):
         r = subprocess.run([sys.executable, "-m", "seasoningway", "--version"], capture_output=True, text=True)
@@ -56,7 +56,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             return result.stdout
 
-        seed_project(root)
+        invoke(root, "init")
         invoke(root, "migrate")
         slug = "2099-02-elsewhere"
         invoke(root, "new", slug, "--title", "範例旅程", "--currency", "TWD", "--travelers", "2")

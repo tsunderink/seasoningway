@@ -23,4 +23,6 @@ jobs:
       - run: python3 -m unittest discover -s tests
         env:
           SEASONINGWAY_BROWSER_TEST: require
-      - run: seasoningway --root tests/fixtures/demo check
+      - uses: ./
+        with:
+          root: tests/fixtures/demo

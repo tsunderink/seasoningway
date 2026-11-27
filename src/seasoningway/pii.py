@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .common import OUT, TRIPS
+from .common import TRIPS
 from .gitops import added_lines, files_to_scan
 
 
@@ -113,5 +113,5 @@ def check_pii(root: Path) -> list[str]:
 def added_pii(root: Path, sha: str) -> list[str]:
     """commit 新增的行裡疑似個資的位置，供 git pre-push 轉接使用。"""
     added = added_lines(root, sha)
-    return [f"{rel}:{n} {kind}" for rel, lines in added.items() if rel.split("/")[0] != OUT
+    return [f"{rel}:{n} {kind}" for rel, lines in added.items()
             for n, text in lines for _, kind in scan_text(text, rel)]

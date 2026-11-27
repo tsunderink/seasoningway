@@ -4,7 +4,7 @@
 
 旅程資料放在你自己的私人 repo（資料 repo），由任何會讀檔、會跑指令的 AI agent（Claude Code、Codex 或其他）規劃。seasoningway 負責驗證資料、產生頁面、保存到 git，讓不同的 agent 交出同樣工整的成果。
 
-> 新版目錄已支援驗證、產物、快取與 Git 保存。各 agent 轉接檔的進度見 [遷移清單](docs/migration.md)。
+舊模板資料 repo 的遷移與版本發布進度見 [遷移清單](docs/migration.md)。
 
 ## 安裝
 
@@ -13,6 +13,12 @@ pip install "git+https://github.com/tsunderink/seasoningway@<版本>"
 ```
 
 需要 Python 3.13 以上。
+
+## 建立資料 repo
+
+在新的空目錄執行 `seasoningway init`，再用 `seasoningway guide plan-trip` 完成設定。啟動 Claude Code 或 Codex 前，請確認該工具能從 `PATH` 執行 `seasoningway`。在 Codex 信任專案後到 `/hooks` 核准 hooks；需要手動執行時，開場用 `seasoningway status`，收尾用 `seasoningway save --check`。
+
+換用新版引擎時，先安裝目標版本，再到資料 repo 執行 `seasoningway upgrade` 和 `seasoningway save`。
 
 ## 指令
 

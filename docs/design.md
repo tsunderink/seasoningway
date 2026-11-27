@@ -37,7 +37,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 ## 3. 指令
 
-找資料 repo：`--root`，沒給就從目前目錄往上找 `seasoningway.toml`。
+找資料 repo：`--root`，沒給就從目前目錄往上找 `seasoningway.toml`。`init` 預設在目前目錄建立。`guide` 可在任意目錄執行。
 
 地圖的輸入與測試見 [tripmap.md](tripmap.md)。
 
@@ -59,7 +59,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 **`save` 的行為：**
 
 1. 驗證，不通過就停下並列出問題。
-2. 加入已追蹤檔案的改動，以及 `trips/`、`profile/`、`seasoningway.toml` 底下的新檔。其他地方的新檔列出來並停下，由 agent 移走或加進 `.gitignore`。
+2. 加入已追蹤檔案的改動、`trips/` 和 `profile/` 底下的新檔，以及 `seasoningway.toml` 和 `wishlist.md`。2026-11-27 起也接受 `init`、`upgrade` 新增且內容符合範本的轉接檔與初始 Git 設定檔。其他新檔會列出來並停止保存，由 agent 移走或加進 `.gitignore`。
 3. commit 訊息由程式產生（改了哪趟旅程、哪幾種檔），`-m` 可以附一句說明。
 4. 依 `git.mode` 同步：`main` 先 `pull --rebase` 再 push；本地有還沒 push 的 merge 時改用 `--no-rebase`。`branch` 推目前分支的 upstream。`local` 只 commit。
 5. 有衝突就讓 rebase 停在衝突處，列出衝突的檔案，結束碼不是 0。agent 整合完再執行一次 `save`，`save` 會接著完成。絕不自動選一邊。
@@ -97,10 +97,10 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 | `.claude/settings.json`、`.codex/hooks.json` | hook 都只呼叫 `seasoningway hook …` |
 | `.claude/skills/`、`.agents/skills/` | 薄入口：什麼時候用，以及執行 `seasoningway guide <主題>` |
 | `.claude/agents/`、`.codex/agents/` | subagent 定義。讀網頁的 subagent 沒有 shell，執行不了 `guide`，所以完整的做法要寫進定義檔 |
-| `.githooks/` | 呼叫 `seasoningway hook git <事件>`；`status`、`save` 會設定 `core.hooksPath` |
+| `.githooks/` | 呼叫 `seasoningway hook git <事件>`；`init`、`upgrade`、`status`、`save` 會設定 `core.hooksPath` |
 | `.github/workflows/check.yml` | `uses: tsunderink/seasoningway@<版本>` |
 
-使用者自己的規則寫在 `profile/`，不寫進轉接檔。
+使用者自己的規則寫在 `profile/`。若同名轉接檔已有自訂內容，先備份並移出產生路徑，再執行 `init` 或 `upgrade`。工具設定和 hooks 的啟用方式見 [建立資料 repo](../README.md#建立資料-repo)。
 
 ## 7. 版本
 

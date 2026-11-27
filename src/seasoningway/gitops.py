@@ -47,8 +47,9 @@ def diff_path(header: str) -> str | None:
 
 def added_lines(root: Path, sha: str) -> dict[str, list[tuple[int, str]]]:
     """commit 新增的文字，按路徑分組，附上行號。"""
-    diff = subprocess.run(["git", "-c", "core.quotePath=false", "diff-tree", "-r", "-p", "-U0", "--no-renames",
-                           "--no-commit-id", "--no-color", sha], cwd=root, capture_output=True).stdout.decode("utf-8", "replace")
+    diff = checked_git(root, "-c", "core.quotePath=false", "diff-tree", "--root", "-r", "-p", "-U0",
+                       "--diff-merges=first-parent", "--no-renames", "--no-ext-diff", "--no-textconv",
+                       "--no-commit-id", "--no-color", sha)
     added: dict[str, list[tuple[int, str]]] = {}
     path, header, n = None, False, 0
     for line in diff.split("\n"):
