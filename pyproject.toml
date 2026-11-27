@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seasoningway"
+dynamic = ["version"]
+description = "讓 AI agent 規劃旅程的引擎：驗證旅程資料、產生頁面、保存到 git"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = ["jsonschema>=4.18,<5"]
+
+[project.scripts]
+seasoningway = "seasoningway.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "seasoningway.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
