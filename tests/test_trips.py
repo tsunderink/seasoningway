@@ -16,7 +16,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from seasoningway import __version__, budget, checks, cli, common, config, gitops, pii, project, records, trips, views
+from seasoningway import __version__, budget, checks, cli, common, config, gitops, pii, project, records, status, trips, views
 
 from fixture_project import seed_project
 
@@ -204,11 +204,17 @@ class ScanTest(unittest.TestCase):
         self.assertEqual(pii.scan_text(one_line, "trips/x/places/inn.json"), [(1, "手機號碼")])  # 只有 note 那個
         self.assertEqual(pii.scan_text(one_line.replace("老闆手機 090-1234-5678", ""), "trips/x/places/inn.json"), [])
 
+    def test_data_path_covers_only_data_files_and_dirs(self):
+        for rel in ("seasoningway.toml", "wishlist.md", "trips/2099-01-x/README.md", "profile/lessons.md"):
+            self.assertTrue(common.data_path(rel), rel)
+        for rel in ("trips", "profile", "tripsx/a.md", "out/index.md", "AGENTS.md", "notes/trips/a.md"):
+            self.assertFalse(common.data_path(rel), rel)
+
     def test_brief_trims_next_steps_for_session_start(self):
-        self.assertEqual(views.brief("- 讀 [map/README.md](map/README.md) 再改"), "讀 map/README.md 再改")
+        self.assertEqual(status.brief("- 讀 [map/README.md](map/README.md) 再改"), "讀 map/README.md 再改")
         long = "- " + "字" * 100
-        self.assertEqual(len(views.brief(long)), views.BRIEF_CHARS)
-        self.assertTrue(views.brief(long).endswith("…"))
+        self.assertEqual(len(status.brief(long)), status.BRIEF_CHARS)
+        self.assertTrue(status.brief(long).endswith("…"))
 
     def test_luhn(self):
         self.assertTrue(pii.luhn_ok("4111111111111111"))
@@ -600,7 +606,7 @@ class RepoTest(unittest.TestCase):
         project.create_trip(self.root, "2099-02-other-city", "另一趟", 1, None, TODAY)
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            self.assertEqual(views.print_active_trips(self.root), 0)
+            self.assertEqual(status.print_active_trips(self.root), 0)
         self.assertIn("預算算不出來：", out.getvalue())
         self.assertIn("另一趟", out.getvalue())
 

@@ -109,3 +109,13 @@ def validate_trip(trip: Trip) -> list[str]:
     except Problem as e:
         errors.append(str(e))
     return errors
+
+
+def section_lines(path: Path, heading: str) -> list[str]:
+    lines, inside = [], False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            inside = line[3:].strip() == heading
+        elif inside and line.strip() and not line.strip().startswith("<!--"):
+            lines.append(line.rstrip())
+    return lines

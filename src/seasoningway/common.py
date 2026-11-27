@@ -7,7 +7,16 @@ from datetime import date
 
 CONFIG = "seasoningway.toml"
 TRIPS = "trips"
+PROFILE = "profile"
+WISHLIST = "wishlist.md"
 OUT = "out"
+DATA_FILES = (CONFIG, WISHLIST)  # 資料 repo 根目錄裡由使用者和 agent 維護的檔案
+DATA_DIRS = (TRIPS, PROFILE)  # 底下的新檔 save 會直接加入
+
+
+def data_path(rel: str) -> bool:
+    """資料路徑：save 會加入的新檔都要在這裡。rel 是相對於資料 repo 根目錄的 POSIX 路徑。"""
+    return rel in DATA_FILES or ("/" in rel and rel.split("/", 1)[0] in DATA_DIRS)
 
 DONE = "已結束"
 
