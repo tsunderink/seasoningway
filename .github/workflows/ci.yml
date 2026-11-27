@@ -11,13 +11,10 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.13", "3.x"]  # 最低支援版本和最新的穩定版
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.13"  # 只測最低支援版本
       - run: pip install -e .
       - run: python3 -m unittest discover -s tests

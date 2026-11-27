@@ -18,7 +18,7 @@
 1. 從最新的 `main` 開分支：`<工具>/<主題>`，例如 `codex/port-schemas`、`claude/review-save`。
 2. 改程式要附測試。跑 `pip install -e .`、`python3 -m unittest discover -s tests`，全部通過。
 3. commit 訊息用 Conventional Commits，說明用繁體中文：`feat(cli): 實作 render`。範圍用模組名稱（`cli`、`render`、`save`、`schemas`、`tripmap`、`adapters`、`docs` 等）。
-4. push 分支、開 PR 到 `main`，CI 通過後由使用者或使用者指定的審查者合併。
+4. push 分支、開 PR 到 `main`。審查和合併由 Claude 負責（使用者 2026-11-27 指定）：其他工具開的 PR 完成後請使用者交給 Claude，Claude 開的 PR 也由 Claude 在 CI 通過後合併。
 5. 完成 migration.md 的項目就在同一個 PR 裡打勾。
 
 ## 文件
