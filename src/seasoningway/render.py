@@ -26,7 +26,6 @@ def view_links(text: str, slug: str) -> str:
 
 def copy_map_assets(trip: Path, out: Path) -> None:
     for source, relative in (
-        (trip / "cache/roads.txt", "roads.txt"),
         (trip / "cache/base/tiles", "base/tiles"),
         (trip / "map/photos", "photos"),
     ):

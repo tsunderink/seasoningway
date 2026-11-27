@@ -55,6 +55,7 @@ class MapPage:
     geo: dict
     labels: list[dict]
     base: dict
+    road_data: str | None
 
 
 def load_page(t: MapTrip, data: dict) -> MapPage:
@@ -65,9 +66,13 @@ def load_page(t: MapTrip, data: dict) -> MapPage:
             raise Problem(f"{where}：地圖來源或快取目錄指向旅程外")
     required = (t.map / "regions.json", t.cache / "base/tiles.json", t.cache / "base/places.json")
     missing = [p.relative_to(t.dir).as_posix() for p in required if not p.is_file()]
-    roads = (t.cache / "roads.json").is_file(), (t.cache / "roads.txt").is_file()
-    if roads[0] != roads[1]:
-        missing.append("cache/roads.txt" if roads[0] else "cache/roads.json")
+    roads_path = t.cache / "roads.txt"
+    if roads_path.is_symlink():
+        raise Problem(f"{where}：cache/roads.txt 不能是檔案連結")
+    has_road_data = roads_path.is_file()
+    has_road_metadata = (t.cache / "roads.json").is_file()
+    if has_road_data != has_road_metadata:
+        missing.append("cache/roads.txt" if has_road_metadata else "cache/roads.json")
     if missing:
         raise Problem(f"trips/{t.dir.name}/ 還缺 {'、'.join(missing)}，地圖頁產生不了。見 docs/tripmap.md。")
     geo = json.loads((t.map / "regions.json").read_text(encoding="utf-8"))
@@ -120,7 +125,8 @@ def load_page(t: MapTrip, data: dict) -> MapPage:
             if (not path.parts or path.parts[0] != "photos" or ".." in path.parts or "\\" in relative
                     or not (t.map / relative).is_file()):
                 raise Problem(f"{where}：{spot['id']} 的照片要指向 map/photos/ 的檔案")
-    return MapPage(t, data, geo, labels, base)
+    road_data = roads_path.read_text(encoding="utf-8").strip() if has_road_data else None
+    return MapPage(t, data, geo, labels, base, road_data)
 
 
 def render(page: MapPage) -> str:
@@ -136,7 +142,8 @@ def render(page: MapPage) -> str:
     slots["<!--__CREDITS__-->"] = credits_html(data["page"]["credits"])
     slots["/*__LEAFLET_CSS__*/"] = (ASSETS / "leaflet-1.9.4.css").read_text(encoding="utf-8")
     slots |= {"/*__DATA__*/null": script_json(data), "/*__GEO__*/null": script_json(geo, compact=True),
-              "/*__LABELS__*/null": script_json(labels), "/*__BASE__*/null": script_json(base, compact=True)}
+              "/*__LABELS__*/null": script_json(labels), "/*__BASE__*/null": script_json(base, compact=True),
+              "/*__ROADS__*/null": script_json(page.road_data)}
     # 一次換完：分次 replace 的話，前面塞進去的文字裡如果有後面的佔位符，也會被換掉
     page = (ASSETS / "template.html").read_text(encoding="utf-8")
     return re.sub("|".join(map(re.escape, slots)), lambda m: slots[m[0]], page)

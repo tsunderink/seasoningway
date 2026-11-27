@@ -718,12 +718,12 @@ function leg(a, b) { const d = hav(a, b), [f, v] = d >= RD.express_km ? RD.expre
 // 路網（草案）：roads.py 從 OpenStreetMap 抽出的主要道路＋景點接上去的小路（roads.txt），載入後每段沿路算最快路線（A*），
 // 時數用 DATA.road.net 的各級道路時速（不含塞車、天候）；載入前、接不上路網的段落照舊用直線估算
 let NET = null, ROUTES = {};
+const ROAD_DATA = /*__ROADS__*/null;
 async function loadRoads() {
-  if (!DATA.roads) return;
+  if (!ROAD_DATA) return;
   try {
-    const r = await fetch("roads.txt"); if (!r.ok) throw new Error("HTTP " + r.status);
     // roads.py 把 base64 的數字換成符號、去掉結尾的 =（見 DIGIT_SUB），這裡換回來
-    let t = (await r.text()).trim().replace(/[-_.~!*()$,]/g, c => "-_.~!*()$,".indexOf(c));
+    let t = ROAD_DATA.replace(/[-_.~!*()$,]/g, c => "-_.~!*()$,".indexOf(c));
     t = atob(t + "===".slice((t.length + 3) % 4)); let b = new Uint8Array(t.length);
     for (let k = 0; k < t.length; k++) b[k] = t.charCodeAt(k);
     if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());

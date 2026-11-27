@@ -169,14 +169,16 @@ class MapTest(unittest.TestCase):
         images.mkdir(parents=True)
         (images / "0-0.webp").write_bytes(b"test tiles")
         self.write("cache/roads.json", {"asof": "2099-01-01", "snap": {}})
-        (self.trip / "cache/roads.txt").write_text("test road network", encoding="utf-8")
+        road_data = "test road network </script>"
+        (self.trip / "cache/roads.txt").write_text(road_data + "\n", encoding="utf-8")
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(cli.main(["render", self.slug], root=self.root, today=self.today), 0)
         out = self.root / "out" / self.slug / "map"
-        self.assertEqual((out / "roads.txt").read_text(encoding="utf-8"), "test road network")
+        self.assertFalse((out / "roads.txt").exists())
         self.assertEqual((out / "base/tiles/light/8/0-0.webp").read_bytes(), b"test tiles")
         self.assertFalse((self.trip / "map/index.html").exists())
         page = (out / "index.html").read_text(encoding="utf-8")
+        self.assertEqual(json.loads(re.search(r"^const ROAD_DATA = (.*);$", page, re.MULTILINE).group(1)), road_data)
         self.assertNotIn("<!--__", page)
         self.assertEqual(page.count("/*__"), 2)  # 佔位符都換掉了，只剩標題和地點摘要裡故意寫的
         self.assertIn("<title>測試地圖 /*__DATA__*/null</title>", page)  # 先填進去的文字不會再被換掉
@@ -194,6 +196,10 @@ class MapTest(unittest.TestCase):
         要 Node 的 playwright 和 leaflet 套件。CI 設 SEASONINGWAY_BROWSER_TEST=require，缺了就算失敗。"""
         self.write_map_inputs()
         self.write("places/garden.json", place("garden"))
+        coordinates = {1: (35.0, 135.0), 2: (35.0, 135.01)}
+        edges = [(1, 2, 5, False, False, 1.0, [])]
+        roads.write_bin(coordinates, edges, self.trip / "cache/roads.txt")
+        self.write("cache/roads.json", {"asof": "2099-01-01", "snap": {}})
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(cli.main(["render", self.slug], root=self.root, today=self.today), 0)
         result = browse(self.root / "out" / self.slug / "map/index.html")
@@ -205,6 +211,7 @@ class MapTest(unittest.TestCase):
         for size, r in result.items():
             with self.subTest(size):
                 self.assertEqual(r["errors"], [])
+                self.assertEqual(r["roadNodes"], 2)
                 self.assertNotIn("INJECTED", r["title"])
                 self.assertIn("住宿・旅館（起＝station 名稱）", r["legend"])  # config.home
                 days, spots, hotels = r["views"]["view-days"], r["views"]["view-list"], r["views"]["view-hotels"]

@@ -131,10 +131,13 @@ async function transferPlan(browser, url) {
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(String(e)));
+    page.on('console', msg => { if (/路網載入失敗|roads\.txt/.test(msg.text())) errors.push(msg.text()); });
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     if (await page.evaluate(() => typeof window.L === 'undefined')) throw new Error('Leaflet 載不到');
+    await page.waitForFunction(() => !DATA.roads || NET !== null);
     const text = sel => page.evaluate(s => (document.querySelector(s) || {}).textContent || '', sel);
     const r = { legend: await text('#legend'), title: await page.title(), views: {} };
+    r.roadNodes = await page.evaluate(() => NET?.lat.length ?? 0);
     for (const id of ['view-list', 'view-hotels', 'view-days']) {
       await page.click('#' + id);
       r.views[id] = await text('#list');
