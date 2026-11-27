@@ -40,7 +40,7 @@ repo 以外：artifact 資料庫只存使用者在頁面上的輸入；API 金�
 ## 4. id 和交叉引用
 
 - 每筆紀錄有固定的 id（小寫英數字，用 `-` 連接；地點也可以用 `_`），改名不改 id；一筆一檔的檔名就是 id。
-- 紀錄之間用 id 欄位互連：行程每天的 `places`、`stay_place` 和地圖設定的 `home`、`preset` 指向地點，地點的 `categories` 指向地圖設定的類別，來源的 `url` 可以是研究筆記的相對路徑。schema 用 `x-ref` 註記指向哪一種（`records.REF_KINDS`：`place`、`category`、`file`），check 確認指得到（`ref_problems`）。JSON Schema 本身不檢查資料之間的引用，同類工具都自己做這一步（Astro 的 `reference()`、Backstage 的 relations）。
+- 紀錄之間用 id 欄位互連：`itinerary.json` 每天的 `places`、`stay_place` 和地圖設定的 `home` 指向地點，地點的 `categories` 指向地圖設定的類別，來源的 `url` 可以是研究筆記的相對路徑。地圖的初始行程取自 [逐日行程](tripmap.md#我的行程)。schema 用 `x-ref` 註記指向哪一種（`records.REF_KINDS`：`place`、`category`、`file`），check 確認指得到（`ref_problems`）。JSON Schema 本身不檢查資料之間的引用，同類工具都自己做這一步（Astro 的 `reference()`、Backstage 的 relations）。
 - `x-` 開頭的註記由 `records.annotated` 沿著 schema 找（跟著 `$ref`、`properties`、`items`、`allOf` 等），驗證器會略過它們。
 - 筆記連到紀錄用一般的相對連結，現有的連結檢查會確認它存在。
 

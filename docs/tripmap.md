@@ -9,6 +9,7 @@
 | `places/<id>.json` | 地點，一筆一個檔，格式見 [place.schema.json](../src/seasoningway/schemas/place.schema.json) | Claude、`spot-scout` 寫 |
 | `map/config.json` | 頁面設定：標題、類別、評分網站、季節推薦度、開車參數、底圖範圍，格式見 [map.schema.json](../src/seasoningway/schemas/map.schema.json) | 手寫 |
 | 旅程 `README.md` 開頭的 `start`、`end` | 頁面的日期 | 手寫 |
+| `itinerary.json` | 每天的 `places` 和 `stay_place` 提供初始行程 | 手寫 |
 | `map/regions.json` | 一級行政區界（GeoJSON），`properties` 要有 `zh`（名稱）、`focus`（是不是重點地區）；拉遠時在圖磚上面畫界線和名稱 | 從行政區界開放資料轉，出處寫進設定的 `basemap.credits` |
 | `cache/base/` | 底圖：`tiles/` 圖磚大圖、`tiles.json` 範圍、`places.json` 地名 | `basemap_tiles.py` |
 | `cache/roads.txt`、`cache/roads.json` | 開車路網和每個地點接上的路口（選用；沒有就全用直線估） | `roads.py` |
@@ -96,7 +97,7 @@ artifact 的一個版本最多 512 個檔，頁面、照片、底圖大圖加起
 
 ### 我的行程
 
-- 旅程的每一天：景點照順序排，加上「今晚住哪」（最後一天沒有）。同一個點只排一天，住宿可以連住。設定的 `preset` 可以預先放點（例如已訂門票的景點），使用者可以移走。
+- 旅程的每一天：景點照順序排，加上「今晚住哪」（最後一天沒有）。同一個點只排一天，住宿可以連住。瀏覽器和 artifact 資料庫都沒有已存行程時，從 `itinerary.json` 的 `places`、`stay_place` 帶入，之後可在頁面調整。
 - 預計停留時間：
   - 行程的每一列，摘要開頭標「停留 1–1.5 小時」（景點清單不標）。
   - 每天標題下加總「停留約 3.5–6 小時」，取到半小時，沒估的寫有幾個沒估。

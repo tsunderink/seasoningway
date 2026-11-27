@@ -673,7 +673,7 @@ const DAYS = (() => {
   return out;
 })();
 const LAST = DAYS.length - 1;  // 最後一天搭機回國，沒有「今晚住」
-function blankPlan() { const p = { days: {}, updated: "" }; Object.entries(TRIP.preset || {}).forEach(([iso, ids]) => { p.days[iso] = { ids: ids.slice(), stay: null }; }); return p; }
+function blankPlan() { return cleanPlan({ days: TRIP.preset }); }
 function cleanPlan(p) {  // 只留這趟日期內、還存在的景點；同一個點只留第一次出現的那天
   const out = { days: {}, updated: String(p && p.updated || "") }, used = new Set();
   DAYS.forEach((d, i) => {
@@ -684,8 +684,12 @@ function cleanPlan(p) {  // 只留這趟日期內、還存在的景點；同一�
   });
   return out;
 }
-let plan;
-try { const raw = localStorage.getItem(SK + "plan"); plan = raw ? cleanPlan(JSON.parse(raw)) : blankPlan(); } catch (e) { plan = blankPlan(); }
+let plan, hasSavedPlan = false;
+try {
+  const raw = localStorage.getItem(SK + "plan");
+  if (raw) { plan = cleanPlan(JSON.parse(raw)); hasSavedPlan = true; }
+} catch (e) {}
+plan ??= blankPlan();
 const dayP = i => plan.days[DAYS[i].iso] || (plan.days[DAYS[i].iso] = { ids: [], stay: null });
 // 開車粗估：直線距離 × 繞路係數 ÷ 時速；直線 40 km 以上當高速公路（DATA.road）
 const RD = DATA.road, ll = id => [byId[id].lat, byId[id].lon];
@@ -1699,7 +1703,7 @@ function remoteStars(d) {
 // 行程同步：同星號（plan/itinerary）
 let planRef = null, planBusy = false, planAgain = false, planTimer = 0, planSyncText = "行程存在這個瀏覽器";
 function planSyncUI(t) { planSyncText = t; const el = document.getElementById("plansync"); if (el) el.textContent = t; }
-function savePlanLocal() { try { localStorage.setItem(SK + "plan", JSON.stringify(plan)); } catch (e) {} }
+function savePlanLocal() { hasSavedPlan = true; try { localStorage.setItem(SK + "plan", JSON.stringify(plan)); } catch (e) {} }
 function planDoc() {  // 資料庫裡的格式：days 以日期為鍵，{ids: 景點 id（照順序）, stay: 住宿 id}；沒排東西的天不存
   const days = {};
   DAYS.forEach(d => { const p = plan.days[d.iso]; if (p && (p.ids.length || p.stay)) days[d.iso] = p.stay ? { ids: p.ids.slice(), stay: p.stay } : { ids: p.ids.slice() }; });
@@ -1718,7 +1722,7 @@ async function pushPlan(retry) {
   else if (planAgain) { planAgain = false; pushPlan(); }
 }
 function remotePlan(d) {
-  if (!d || typeof d.days !== "object" || String(d.updated || "") <= plan.updated) return false;
+  if (!d || typeof d.days !== "object" || (hasSavedPlan && String(d.updated || "") <= plan.updated)) return false;
   if (drag) { setTimeout(() => remotePlan(d), 800); return false; }  // 拖曳中先不換
   plan = cleanPlan(d); savePlanLocal(); afterPlanChange();
   return true;
@@ -1743,7 +1747,7 @@ async function connectDoc(db, path, o) {
   try { db = await window.claude.use("db"); } catch (e) {}
   if (!db) return;
   connectDoc(db, "plan/stars", { what: "星號", ui: syncUI, setRef: r => { starRef = r; }, remote: remoteStars, hasLocal: () => starSet.size > 0, at: () => starAt, push: () => pushStars() });
-  connectDoc(db, "plan/itinerary", { what: "行程", ui: planSyncUI, setRef: r => { planRef = r; }, remote: remotePlan, hasLocal: () => Object.keys(planDoc().days).length > 0, at: () => plan.updated, push: () => pushPlan() });
+  connectDoc(db, "plan/itinerary", { what: "行程", ui: planSyncUI, setRef: r => { planRef = r; }, remote: remotePlan, hasLocal: () => hasSavedPlan && Object.keys(planDoc().days).length > 0, at: () => plan.updated, push: () => pushPlan() });
 })();
 function planText() {
   const out = [PAGE.short + "：我的行程（開車時數是" + (NET ? "沿 OpenStreetMap 道路估算，不含塞車、天候" : "直線估算") + "，停留時間是 Claude 估計）"];

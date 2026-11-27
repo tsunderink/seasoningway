@@ -10,7 +10,7 @@ from .common import CONFIG, Problem
 from .records import missing_dependency, record_problems
 
 
-FORMAT = 4  # 資料格式版本：改了資料檔的格式就加 1，並在 MIGRATIONS 加一步
+FORMAT = 5  # 資料格式版本：改了資料檔的格式就加 1，並在 MIGRATIONS 加一步
 ASSISTANTS = ("Claude", "Codex")  # 規劃助理：只研究和整理，不訂東西
 FIXED_ACTORS = ("使用者", *ASSISTANTS)  # 「下一步」開頭一律可以寫的；其他角色代稱寫在 seasoningway.toml 的 people.roles
 

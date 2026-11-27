@@ -33,12 +33,6 @@
       "additionalProperties": {"type": "string", "minLength": 1},
       "description": "每天的固定事項（抵達、取還車、已訂的入住），顯示在那天的標題下；決定本身寫在旅程 README「已決定」"
     },
-    "preset": {
-      "type": "object",
-      "propertyNames": {"$ref": "common.schema.json#/$defs/date"},
-      "additionalProperties": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/place_ref"}},
-      "description": "使用者還沒有自己的行程時，預先放進那天的點（例如已訂門票的景點）"
-    },
     "view": {
       "type": "object",
       "additionalProperties": false,

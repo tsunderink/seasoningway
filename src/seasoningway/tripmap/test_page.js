@@ -1,5 +1,5 @@
 // 地圖頁的瀏覽器煙霧測試，由 test_tripmap.py 呼叫：node test_page.js <index.html>
-// 在桌面、手機兩種尺寸打開頁面，切換三個分頁、收合地圖（只有手機有），把看到的文字和 JS 錯誤印成一行 JSON；
+// 桌面與手機檢查初始行程、三個分頁和地圖收合，桌面再檢查已存行程與資料庫同步的優先順序。
 // 判斷對不對由 test_tripmap.py 做。Leaflet 用和頁面 CDN 相同的版本，由本機套件提供。
 const { pathToFileURL } = require('node:url');
 let chromium;
@@ -16,6 +16,45 @@ async function launch() {
 }
 
 const SIZES = { desktop: { width: 1280, height: 900 }, phone: { width: 390, height: 844 } };
+const planCards = page => page.evaluate(() => {
+  const cards = kind => Array.from(document.querySelectorAll(`#list .mini[data-kind="${kind}"]`),
+    ({ dataset }) => [dataset.day, dataset.id]);
+  return { stops: cards('plan'), stays: cards('stay') };
+});
+
+async function savedPlans(page) {
+  await page.addInitScript(() => {
+    const saved = JSON.parse(localStorage.getItem('test-db-plan'));
+    window.testPlanWrites = 0;
+    window.claude = { use: async () => ({ doc: path => {
+      const value = path === 'plan/itinerary' ? saved : null;
+      return {
+        get: async () => ({ exists: value !== null, data: () => value }),
+        onSnapshot: () => {},
+        set: async () => { if (path === 'plan/itinerary') window.testPlanWrites++; },
+      };
+    } }) };
+  });
+  const empty = { days: {}, updated: '2099-01-02T00:00:00Z' };
+  const remote = { days: { '2099-01-01': { stay: 'inn' } } };
+  const reload = async (local, db) => {
+    await page.evaluate(([local, db]) => {
+      for (const [key, value] of [['test-plan', local], ['test-db-plan', db]]) {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, JSON.stringify(value));
+      }
+    }, [local, db]);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#plansync')?.textContent.startsWith('已'));
+    return planCards(page);
+  };
+  const local = await reload(empty, null);
+  const fromDb = await reload(null, remote);
+  const newerLocal = await reload(empty, { ...remote, updated: '2099-01-01T00:00:00Z' });
+  const fallback = await reload(null, null);
+  const fallbackWrites = await page.evaluate(() => window.testPlanWrites);
+  return { local, remote: fromDb, newerLocal, fallback, fallbackWrites };
+}
 
 (async () => {
   const browser = await launch();
@@ -35,8 +74,10 @@ const SIZES = { desktop: { width: 1280, height: 900 }, phone: { width: 390, heig
       await page.click('#' + id);
       r.views[id] = await text('#list');
     }
+    r.plan = await planCards(page);
     r.maptoggle = await page.isVisible('#maptoggle');  // 只有窄螢幕有「收起地圖」
     if (r.maptoggle) { await page.click('#maptoggle'); await page.click('#maptoggle'); }
+    if (name === 'desktop') r.saved = await savedPlans(page);
     r.errors = errors;
     out[name] = r;
     await ctx.close();

@@ -1,11 +1,11 @@
-"""把第 3 版資料升級到第 4 版。"""
+"""升級既有的旅程資料格式。"""
 import json
 import posixpath
 import re
 from pathlib import Path
 from urllib.parse import unquote
 
-from .common import Problem, TRIPS
+from .common import Problem, TRIPS, real_date
 from .files import write_text
 from .published import publication_paths
 from .records import dump_json, parse_json, record_kind, record_paths, schema_url
@@ -139,4 +139,65 @@ def upgrade_v4(root: Path) -> list[str]:
             changed.append(attrs.name)
     if ensure_out_ignored(root):
         changed.append(".gitignore")
+    return changed
+
+
+def upgrade_v5(root: Path) -> list[str]:
+    """將地圖預排行程合併到逐日行程，保留既有安排。"""
+    updates = {}
+    changed = []
+    for path in sorted((root / TRIPS).glob("*/map/config.json")):
+        trip = path.parents[1]
+        rel = path.relative_to(root).as_posix()
+        if not trip.resolve().is_relative_to(root.resolve()) or not path.resolve().is_relative_to(trip.resolve()):
+            raise Problem(f"{rel}：地圖設定指向旅程外")
+        cfg = parse_json(path.read_text(encoding="utf-8"), rel)
+        if not isinstance(cfg, dict):
+            raise Problem(f"{rel}：紀錄要是 JSON 物件")
+        if "preset" not in cfg:
+            continue
+        preset = cfg.pop("preset")
+        if not isinstance(preset, dict) or any(
+            not real_date(day) or not isinstance(ids, list) or any(not isinstance(pid, str) for pid in ids)
+            for day, ids in preset.items()
+        ):
+            raise Problem(f"{rel}：preset 應為日期對應地點 id 清單")
+
+        if any(preset.values()):
+            itinerary_path = trip / "itinerary.json"
+            itinerary_rel = itinerary_path.relative_to(root).as_posix()
+            if not itinerary_path.is_file() or not itinerary_path.resolve().is_relative_to(trip.resolve()):
+                raise Problem(f"{itinerary_rel}：合併 preset 需要旅程內的行程檔")
+            itinerary = parse_json(itinerary_path.read_text(encoding="utf-8"), itinerary_rel)
+            days = itinerary.get("days") if isinstance(itinerary, dict) else None
+            if not isinstance(days, list) or any(
+                not isinstance(day, dict) or not isinstance(day.get("date"), str) or not real_date(day["date"])
+                or not isinstance(day.get("places", []), list)
+                or any(not isinstance(pid, str) for pid in day.get("places", []))
+                for day in days
+            ):
+                raise Problem(f"{itinerary_rel}：days 應為含日期及可選地點清單的逐日紀錄")
+            by_date = {day["date"]: day for day in days}
+            scheduled = {pid for day in days for pid in day.get("places", [])}
+            count, original_days = 0, len(days)
+            for iso, ids in sorted(preset.items()):
+                for pid in ids:
+                    if pid in scheduled:
+                        continue
+                    if iso not in by_date:
+                        by_date[iso] = {"date": iso}
+                        days.append(by_date[iso])
+                    by_date[iso].setdefault("places", []).append(pid)
+                    scheduled.add(pid)
+                    count += 1
+            if count:
+                if len(days) > original_days:
+                    days.sort(key=lambda day: day["date"])
+                updates[itinerary_path] = dump_json(itinerary)
+                changed.append(f"{itinerary_rel}：併入 {count} 個預排地點")
+
+        updates[path] = dump_json(cfg)
+        changed.append(f"{rel}：移除 preset")
+    for path, text in updates.items():
+        write_text(path, text)
     return changed
