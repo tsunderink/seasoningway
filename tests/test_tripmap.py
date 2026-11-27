@@ -27,7 +27,6 @@ CONFIG = {
     "drive": {"max_hours": 4},
     "basemap": {"wide": [7, 0, 1, 0, 1], "fine": [8, 0, 1, 0, 1],
                 "credits": [{"what": "鐵路", "source": "測試<資料>", "url": "https://example.com/rail"}]},
-    "preset": {"2099-01-02": ["temple"]},
 }
 
 
@@ -58,8 +57,15 @@ class MapTest(unittest.TestCase):
         (self.trip / "README.md").write_text("---\ntitle: 測試\nstatus: 規劃中\nstart: 2099-01-01\nend: 2099-02-02\n"
                                              "travelers: 2\ncurrency: TWD\n---\n# 測試\n", encoding="utf-8")
         self.write("map/config.json", CONFIG)
+        self.write("itinerary.json", {"days": [
+            {"date": "2099-01-01"},
+            {"date": "2099-01-02", "places": ["temple"], "stay_place": "inn"},
+            {"date": "2099-01-03", "stay_place": "inn"},
+            {"date": "2099-02-02", "places": ["temple", "station"], "stay_place": "inn"},
+        ]})
         self.write("places/station.json", place("station", categories=["base"], season={}, local_name="駅",
                                                 contact={"address": "某處 1-1", "phone": "+81-3-0000-0000"}))
+        self.write("places/inn.json", place("inn", categories=["base"], season={}, lodging={"area": "測試市"}))
         self.write("places/temple.json", place("temple", local_name="寺【本堂】（東）", summary=INJECTED,
                                                sources=[{"url": "https://example.com/temple", "title": "來源"}, {"url": "research/a.md"},
                                                         {"url": "https://www.example.org/untitled"}], ratings=[
@@ -90,7 +96,12 @@ class MapTest(unittest.TestCase):
         self.assertEqual(station["facts"], [["地址", "某處 1-1"], ["電話", "+81-3-0000-0000"]])
         self.assertNotIn("tier", station)
         self.assertEqual(data["trip"], {"start": "2099-01-01", "end": "2099-02-02", "home": "station", "holidays": {},
-                                        "notes": {}, "preset": {"2099-01-02": ["temple"]}})
+                                        "notes": {}, "preset": {
+                                            "2099-01-01": {},
+                                            "2099-01-02": {"ids": ["temple"], "stay": "inn"},
+                                            "2099-01-03": {"stay": "inn"},
+                                            "2099-02-02": {"ids": ["temple", "station"], "stay": "inn"},
+                                        }})
         self.assertEqual(data["page"]["view"], {"lat": 35.0, "lon": 135.0, "zoom": 6})
         self.assertEqual(data["page"]["texts"]["region_word"], "地區")
         self.assertEqual(data["cats"], [["sight", "景", "景點"], ["base", "住", "住宿"]])
@@ -109,6 +120,18 @@ class MapTest(unittest.TestCase):
         with self.assertRaises(common.Problem) as e:
             page_data(MapTrip(self.trip))
         self.assertIn("不存在的地點 airport", str(e.exception))
+
+    def test_bad_itinerary_references_are_reported_once(self):
+        self.write_map_inputs()
+        self.write("itinerary.json", {"days": [{"date": "2099-01-02", "places": ["garden"], "stay_place": "hotel"}]})
+        problems, _ = checks.run_check(self.root, self.today)
+        refs = [problem for problem in problems if "itinerary.json" in problem]
+        self.assertEqual(len(refs), 2)
+        self.assertTrue(any("地點 garden 不存在" in problem for problem in refs))
+        self.assertTrue(any("地點 hotel 不存在" in problem for problem in refs))
+        with self.assertRaises(common.Problem) as e:
+            page_data(MapTrip(self.trip))
+        self.assertCountEqual(str(e.exception).splitlines(), refs)
 
     def test_map_query(self):
         cfg = {"search": {"region_replace": [["縣", "県"]]}}
@@ -186,10 +209,18 @@ class MapTest(unittest.TestCase):
                 days, spots, hotels = r["views"]["view-days"], r["views"]["view-list"], r["views"]["view-hotels"]
                 self.assertIn("・33 天", days)
                 self.assertIn("第 2 天", days)
-                self.assertIn("temple 名稱", days)  # config.preset 排在 1/2
+                self.assertIn("temple 名稱", days)
+                self.assertIn("住：inn 名稱", days)
+                self.assertEqual(r["plan"], {"stops": [["1", "temple"]], "stays": [["1", "inn"], ["2", "inn"]]})
                 self.assertIn("第 2 天・1/2（五）", spots)
-                self.assertIn("已定住宿 0 / 32 晚", hotels)
+                self.assertIn("已定住宿 2 / 32 晚", hotels)
                 self.assertEqual(r["maptoggle"], size == "phone")
+        saved = result["desktop"]["saved"]
+        self.assertEqual(saved["local"], {"stops": [], "stays": []})
+        self.assertEqual(saved["remote"], {"stops": [], "stays": [["0", "inn"]]})
+        self.assertEqual(saved["newerLocal"], {"stops": [], "stays": []})
+        self.assertEqual(saved["fallback"], result["desktop"]["plan"])
+        self.assertEqual(saved["fallbackWrites"], 0)
 
     def test_dates_text(self):
         self.assertEqual(render.dates_text("2099-01-03", "2099-01-08"), "2099 年 1 月 3 日至 8 日，共 6 天。")

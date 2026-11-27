@@ -1,6 +1,6 @@
 # 這個資料 repo 使用的 seasoningway 版本。
-engine = "0.1.1"
-format = 4  # 資料格式版本，由 seasoningway migrate 更新
+engine = "0.2.0"
+format = 5  # 資料格式版本，由 seasoningway migrate 更新
 
 [git]
 # main：保存到 origin/main，branch：保存到目前分支的 upstream，local：只 commit。

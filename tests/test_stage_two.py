@@ -85,7 +85,7 @@ class StageTwoTest(unittest.TestCase):
         custom = self.write("budget.md", "# 手寫筆記\n")
         self.write("extra.md", "[預訂](bookings.md)、[bookings.md](bookings.md)\n")
         self.run_cli("migrate")
-        self.assertEqual(config.load_config(self.root).format, 4)
+        self.assertEqual(config.load_config(self.root).format, config.FORMAT)
         for path in records.record_paths(self.trip):
             kind = records.record_kind(path.relative_to(self.root).as_posix())
             self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["$schema"], records.schema_url(kind))

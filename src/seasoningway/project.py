@@ -12,7 +12,7 @@ from . import config
 from .common import CONFIG, CURRENCY_RE, SLUG_RE, TRIPS, Problem
 from .files import write_text
 from .trips import Trip, load_trip
-from .migration import upgrade_v4
+from .migration import upgrade_v4, upgrade_v5
 
 TEMPLATES = files("seasoningway").joinpath("templates")
 
@@ -58,7 +58,7 @@ def create_trip(root: Path, slug: str, title: str | None, travelers: int, curren
 
 
 OLDEST = 3  # 能升級的最舊版本；更舊的轉換程式在資料都轉完後刪了（在 git 歷史裡）
-MIGRATIONS = {4: upgrade_v4}  # 從 OLDEST 往上，升到第 n 版要做的事：{n: 函式(root) -> 做了什麼}；每一步只能依賴上一版的格式
+MIGRATIONS = {4: upgrade_v4, 5: upgrade_v5}  # 從 OLDEST 往上，升到第 n 版要做的事：{n: 函式(root) -> 做了什麼}；每一步只能依賴上一版的格式
 
 
 def set_format(root: Path, version: int) -> None:

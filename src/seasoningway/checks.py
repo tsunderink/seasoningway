@@ -284,7 +284,8 @@ def check_records(root: Path, trips: list[Trip]) -> tuple[list[str], set[Path]]:
                 continue
             refs = ref_problems(root, rel, record_kind(rel), json.loads(text))
             problems += refs
-            bad |= {t.path} if refs and path.parent != t.path else set()
+            if refs and (path.parent != t.path or path.name == "itinerary.json"):
+                bad.add(t.path)
     return problems, bad
 
 

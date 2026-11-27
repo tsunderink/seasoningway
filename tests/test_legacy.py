@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tomllib
@@ -74,6 +75,9 @@ class LegacyMigrationTest(DataRepoTest):
         old_trip = self.root / "data" / TRIP
         old = {name: (old_trip / name).read_text(encoding="utf-8") for name in VIEWS}
         old["index.md"] = (self.root / "data/README.md").read_text(encoding="utf-8")
+        if os.environ.get("SEASONINGWAY_LEGACY_CORE"):
+            digest = hashlib.sha256((old_trip / "map/index.html").read_bytes()).hexdigest()
+            self.assertEqual(digest, (FIXTURES / "legacy-template-map.sha256").read_text(encoding="ascii").strip())
         cache_names = ("roads.txt", "roads.json", "place_ids.json", "base/places.json", "base/tiles.json")
         caches = {name: (old_trip / "map" / name).read_bytes() for name in cache_names}
         profile = (self.root / "data/profile/preferences.md").read_bytes()
@@ -81,7 +85,9 @@ class LegacyMigrationTest(DataRepoTest):
         nested = self.cli("migrate", "--from-template", cwd=old_trip / "research")
         self.assertNotEqual(nested.returncode, 0)
         self.assertIn("根目錄", nested.stderr)
-        self.ok(self.cli("migrate", "--from-template"))
+        migration = self.ok(self.cli("migrate", "--from-template"))
+        self.assertIn("第 4 版：", migration)
+        self.assertIn("第 5 版：", migration)
         self.assertEqual(self.ok(self.git("rev-parse", "HEAD")).strip(), original)
         for name in ("data", "core", "README.md", ".codex/agents/old.toml"):
             self.assertFalse((self.root / name).exists(), name)
@@ -98,6 +104,8 @@ class LegacyMigrationTest(DataRepoTest):
         self.assertEqual((settings["engine"], settings["format"], settings["git"]["mode"]),
                          (__version__, FORMAT, "local"))
         trip = self.root / TRIP
+        cfg = json.loads((trip / "map/config.json").read_text(encoding="utf-8"))
+        self.assertNotIn("preset", cfg)
         for name in (*VIEWS, "map/index.html"):
             self.assertFalse((trip / name).exists(), name)
         for name, original_bytes in caches.items():
@@ -118,8 +126,10 @@ class LegacyMigrationTest(DataRepoTest):
             path = output / name if name == "index.md" else output / SLUG / name
             self.assertEqual(path.read_bytes().decode("utf-8"), expected_view(text, name), name)
         map_dir = output / SLUG / "map"
-        digest = hashlib.sha256((map_dir / "index.html").read_bytes()).hexdigest()
-        self.assertEqual(digest, (FIXTURES / "legacy-template-map.sha256").read_text(encoding="ascii").strip())
+        page = (map_dir / "index.html").read_text(encoding="utf-8")
+        preset = json.loads(re.search(r"^const DATA = (.*);$", page, re.MULTILINE).group(1))["trip"]["preset"]
+        self.assertEqual(preset, {"2099-01-15": {}, "2099-01-16": {"ids": ["old-town"]},
+                                  "2099-01-17": {"ids": ["riverside-path", "example-temple"]}})
         self.assertEqual((map_dir / "roads.txt").read_bytes(), caches["roads.txt"])
 
         self.assertEqual(self.ok(self.git("config", "--local", "core.hooksPath")).strip(), ".githooks")

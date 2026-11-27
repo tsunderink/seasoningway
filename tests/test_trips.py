@@ -284,6 +284,44 @@ class RepoTest(unittest.TestCase):
         self.assertIn("migrate 需要已建立的資料 repo", err.getvalue())
         self.assertEqual(list(fresh.iterdir()), [])
 
+    def test_migrate_v5_merges_map_preset_into_itinerary(self):
+        self.set_config(f"format = {config.FORMAT}", "format = 4")
+        self.write_record("itinerary.json", {"summary": "草案", "days": [
+            {"date": "2099-01-01", "places": ["old-town"], "stay_place": "inn"},
+            {"date": "2099-01-03", "places": ["temple"]},
+        ]})
+        self.write_record("map/config.json", {"home": "station", "preset": {
+            "2099-01-03": ["park", "garden"],
+            "2099-01-01": ["old-town", "temple", "path", "path"],
+            "2099-01-02": ["path", "park"],
+            "2099-01-04": ["old-town"],
+        }})
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 0)
+        self.assertEqual(config.load_config(self.root).format, 5)
+        self.assertIn("itinerary.json：併入 3 個預排地點", out.getvalue())
+        self.assertIn("map/config.json：移除 preset", out.getvalue())
+        itinerary = json.loads((self.trip.path / "itinerary.json").read_text(encoding="utf-8"))
+        self.assertEqual(itinerary["summary"], "草案")
+        self.assertEqual(itinerary["days"], [
+            {"date": "2099-01-01", "places": ["old-town", "path"], "stay_place": "inn"},
+            {"date": "2099-01-02", "places": ["park"]},
+            {"date": "2099-01-03", "places": ["temple", "garden"]},
+        ])
+        settings = json.loads((self.trip.path / "map/config.json").read_text(encoding="utf-8"))
+        self.assertEqual(settings, {"$schema": records.schema_url("map"), "home": "station"})
+
+    def test_migrate_v5_with_no_preset_keeps_records_byte_for_byte(self):
+        self.set_config(f"format = {config.FORMAT}", "format = 4")
+        self.write_record("map/config.json", {"home": "station"})
+        paths = [self.trip.path / name for name in ("map/config.json", "itinerary.json")]
+        before = [path.read_bytes() for path in paths]
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.main(["migrate"], root=self.root, today=TODAY), 0)
+        self.assertEqual(config.load_config(self.root).format, 5)
+        self.assertNotIn("preset", out.getvalue())
+        self.assertEqual([path.read_bytes() for path in paths], before)
+
     def test_migrate_refuses_versions_it_cannot_upgrade(self):
         self.set_config(f"format = {config.FORMAT}", f"format = {config.FORMAT + 1}")
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:

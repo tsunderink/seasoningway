@@ -1,6 +1,4 @@
-"""地圖頁的資料：讀一趟旅程的地點（places/*.json）、地圖設定（map/config.json）和旅程 README 開頭的日期，
-整理成頁面內嵌的資料（page_data）。地點和設定的格式在 schemas/place.schema.json、schemas/map.schema.json。
-"""
+"""讀地點、地圖設定、逐日行程和旅程日期，整理成地圖頁內嵌的資料。"""
 import json
 import re
 from pathlib import Path
@@ -8,7 +6,7 @@ from urllib.parse import urlparse
 
 from ..common import Problem, real_date
 
-from ..records import parse_front_matter, record_problems
+from ..records import parse_front_matter, read_record, record_problems, ref_problems
 DEFAULT_TEXTS = {
     "drive_note": "開車路線與時數沿 OpenStreetMap 的主要道路粗估，不含塞車和天候；實際以每天的「Google 地圖 ↗」為準，"
                   "中途點超過 3 個時請用 App 開。停留時間和推薦度是 Claude 的估計。",
@@ -146,9 +144,19 @@ def page_data(t: MapTrip) -> dict:
     unknown = sorted({c for p in t.places for c in p["categories"]} - known)
     if unknown:
         raise Problem(f"{t.map.name}/config.json 的 categories 沒有定義：{'、'.join(unknown)}（地點用到的類別都要列）")
-    for ref in [cfg["home"], *(i for ids in cfg.get("preset", {}).values() for i in ids)]:
-        if ref not in t.by_id:
-            raise Problem(f"map/config.json 指到不存在的地點 {ref}（places/{ref}.json）")
+    home = cfg["home"]
+    if home not in t.by_id:
+        raise Problem(f"map/config.json 指到不存在的地點 {home}（places/{home}.json）")
+    root = t.dir.parents[1]
+    itinerary_path = t.dir / "itinerary.json"
+    itinerary = read_record(root, itinerary_path)
+    problems = ref_problems(root, itinerary_path.relative_to(root).as_posix(), "itinerary", itinerary)
+    if problems:
+        raise Problem("\n".join(problems))
+    preset = {
+        day["date"]: {target: day[source] for source, target in (("places", "ids"), ("stay_place", "stay")) if source in day}
+        for day in itinerary["days"]
+    }
     dates = sorted(p["as_of"] for p in t.places)
     lat = [p["location"]["lat"] for p in t.places]
     lon = [p["location"]["lon"] for p in t.places]
@@ -159,8 +167,8 @@ def page_data(t: MapTrip) -> dict:
         "as_of": f"{dates[0]}～{dates[-1]}" if dates else "",
         "spots": [page_spot(p, cfg, place_ids, photos) for p in t.places],
         "cats": [[c["id"], c["glyph"], c["name"]] for c in cfg["categories"]],
-        "trip": {"start": t.start, "end": t.end, "home": cfg["home"], "holidays": cfg.get("holidays", {}),
-                 "notes": cfg.get("notes", {}), "preset": cfg.get("preset", {})},
+        "trip": {"start": t.start, "end": t.end, "home": home, "holidays": cfg.get("holidays", {}),
+                 "notes": cfg.get("notes", {}), "preset": preset},
         "road": {"express": straight["express"], "local": straight["local"], "express_km": straight["express_km"], "net": network},
         "max_h": drive["max_hours"],
         "roads": {"asof": roads["asof"], "snap": roads["snap"]} if roads else None,
