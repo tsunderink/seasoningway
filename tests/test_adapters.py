@@ -105,6 +105,14 @@ class AdapterTest(DataRepoTest):
         self.ok(self.cli("init"))
         self.assertEqual(self.ok(self.git("status", "--porcelain")), "")
 
+    def test_new_trip_saves_with_git_hooks(self):
+        self.initialize()
+        self.ok(self.cli("save"))
+        self.ok(self.cli("new", "2099-05-example-town", "--currency", "TWD"))
+        self.ok(self.cli("save"))
+        self.assertIn("trips/2099-05-example-town/research/.gitkeep", self.ok(self.git("ls-files")))
+        self.assertEqual(self.ok(self.git("status", "--porcelain")), "")
+
     def test_upgrade_updates_versions_and_migrates_demo_preserving_profile(self):
         self.initialize()
         shutil.copytree(DEMO / "trips", self.root / "trips", dirs_exist_ok=True)
