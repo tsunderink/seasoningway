@@ -16,6 +16,8 @@ URL_PII_RE = re.compile(
     r"|(?:last|first|family|given|sur)_?name|surname|passport\w*)=[^&#\s]"
     r"|[?&#;](?i:\w*(?:phone|mobile)\w*|tel(?:_?(?:no|num|number))?)=(?:[^&#\s\d]*\d){6}"  # 電話、信箱看值：mobile=1 這類開關不算
     r"|[?&#;](?i:\w*mail\w*)=[^&#\s]*(?:@|%40)")
+# sha256、git commit 這類 40 碼以上的十六進位雜湊（published.json 的來源雜湊）不掃：裡面的數字串會被誤認成卡號、手機號碼
+HEX_DIGEST_RE = re.compile(r"(?<![0-9A-Za-z])[0-9a-f]{40,}(?![0-9A-Za-z])")
 CARD_RE = re.compile(r"(?<!\d)(?:\d{13,19}|\d{4}(?:[ -]\d{4}){2}[ -]\d{1,7}|\d{4}[ -]\d{6}[ -]\d{5})(?!\d)")
 SAY = r"\s*(?:是|為|は|[:：=#])?\s*"  # 標籤和值之間：冒號、「是」「為」，或什麼都沒有
 # 代號：全大寫英數字、含數字的英數字（排除 number 這種英文字），或用 - . 分段的（12-3456-7890、4012.345.678）；
@@ -75,13 +77,13 @@ def luhn_ok(digits: str) -> bool:
 
 
 def scan_text(text: str, rel: str = "") -> list[tuple[int, str]]:
-    """回傳 [(行號, 疑似個資種類)]。含 pii-ok 的行略過，網址內容不掃；rel 是地點檔時，店家電話（"phone" 的值）不掃。"""
+    """回傳 [(行號, 疑似個資種類)]。含 pii-ok 的行略過，網址和十六進位雜湊不掃；rel 是地點檔時，店家電話（"phone" 的值）不掃。"""
     hits = []
     place = rel.startswith(f"{TRIPS}/") and "/places/" in rel and rel.endswith(".json")
     for n, line in enumerate(text.splitlines(), 1):
         if PII_OK in line:
             continue
-        clean = URL_RE.sub(" ", line)
+        clean = HEX_DIGEST_RE.sub(" ", URL_RE.sub(" ", line))
         if any(URL_PII_RE.search(url) for url in URL_RE.findall(line)):
             hits.append((n, "網址參數裡的個資（訂位代號、姓名、聯絡方式）"))
         if place:

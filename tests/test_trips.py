@@ -220,6 +220,15 @@ class ScanTest(unittest.TestCase):
         self.assertTrue(pii.luhn_ok("4111111111111111"))
         self.assertFalse(pii.luhn_ok("4111111111111112"))
 
+    def test_hex_digests_are_not_scanned(self):
+        # 雜湊裡剛好有通過 Luhn 的 16 碼數字、或像日本手機的數字串（published.json 的來源雜湊）
+        for digest in ("ab" + "4111111111111111" + "c" * 46, "e" * 20 + "09012345678" + "f" * 33):
+            self.assertEqual(len(digest), 64)
+            self.assertEqual(pii.scan_text(f'    "places/x.json": "{digest}",', "trips/x/map/published.json"), [])
+        self.assertEqual(pii.scan_text("卡號以外 4111111111111111"), [(1, "信用卡號")])
+        self.assertEqual(pii.scan_text("x4111111111111111"), [(1, "信用卡號")])  # 太短、不是雜湊，照樣掃
+        self.assertEqual(pii.scan_text("老闆手機 090-1234-5678"), [(1, "手機號碼")])
+
     def test_dump_json_is_the_record_style(self):
         self.assertEqual(records.dump_json({"金額": Decimal("1.50"), "n": Decimal("3")}), '{\n  "金額": 1.5,\n  "n": 3\n}\n')
 
