@@ -17,6 +17,16 @@ jobs:
         with:
           python-version: "3.13"  # 只測最低支援版本
       - run: pip install -e .
+      - name: 驗證 GitHub Release 安裝包
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/seasoningway.zip"
+          install_bin="$RUNNER_TEMP/seasoningway-install/bin"
+          git archive --format=zip --prefix=seasoningway/ --output="$archive" HEAD
+          python3 -m venv "$RUNNER_TEMP/seasoningway-install"
+          "$install_bin/python" -m pip install "$archive"
+          test "$("$install_bin/seasoningway" --version)" = "$(seasoningway --version)"
+          "$install_bin/seasoningway" guide plan-trip > /dev/null
       - run: npm install -g playwright@1 leaflet@1.9.4 && echo "NODE_PATH=$(npm root -g)" >> "$GITHUB_ENV"
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
