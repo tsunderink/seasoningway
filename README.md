@@ -8,11 +8,17 @@
 
 ## 安裝
 
+需要 Python 3.13 以上。安裝或更新到最新的 GitHub 正式發布版：
+
 ```bash
-pip install "git+https://github.com/tsunderink/seasoningway@<版本>"
+pip install --upgrade "https://github.com/tsunderink/seasoningway/releases/latest/download/seasoningway.zip"
 ```
 
-需要 Python 3.13 以上。
+需要指定版本時，使用完整的 Git 標籤，例如 `v0.4.0`：
+
+```bash
+pip install "git+https://github.com/tsunderink/seasoningway@v0.4.0"
+```
 
 ## 建立資料 repo
 

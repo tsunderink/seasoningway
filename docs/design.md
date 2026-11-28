@@ -104,7 +104,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 
 ## 7. 版本
 
-- 引擎用 semver。`0.x` 期間資料格式可以變，但每次變都要有 `migrate`。
+- 引擎用 semver。`0.x` 期間資料格式可以變，但每次變都要有 `migrate`。2026-11-28 起，發版流程從通過 main CI 的 commit 建立安裝包，隨 GitHub Release 發布，供[安裝指令](../README.md#安裝)取得最新正式版。
 - 資料格式另用 `format` 記版本。改紀錄 schema 或旅程 README 的欄位時，更新 `config.FORMAT`、在 `project.MIGRATIONS` 新增從前一版升級的步驟，並用虛構資料測試。`migrate` 支援從第 3 版起升級。
 - 資料 repo 的 `seasoningway.toml` 寫 `engine = "X.Y.Z"`。`upgrade` 一起改這個版本、CI 的 `uses:` 版本，並重寫轉接檔。
 - 安裝的引擎和 `engine` 的 major.minor 不同時：`status` 提醒，`save` 拒絕保存，避免用錯的格式寫資料。
@@ -113,7 +113,7 @@ AGENTS.md 等轉接檔     由 init、upgrade 產生（第 6 節）
 ## 8. 從舊引擎拿掉的
 
 - 引擎和資料分開 commit、引擎 commit 訊息不能寫旅程細節的檢查（`commit-msg`、`commits`）。資料 repo 裡沒有引擎。
-- 從模板建立、合併上游（包括 graft 歷史）的流程。改由 `pip install` 指定版本，再 `upgrade`。
+- 從模板建立、合併上游（包括 graft 歷史）的流程。改用[套件安裝流程](../README.md#安裝)和第 7 節的升級流程。
 - Codex 專用的引擎分支流程。引擎 repo 改用一般的 PR 流程。
 - 產物 commit 進 repo，以及 `.gitattributes` 的產物清單和「產物是不是最新的」檢查。
 - 規則檔裡「改了檔案的回合結束前」的手動步驟。改用 `save`。

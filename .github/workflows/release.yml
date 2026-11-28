@@ -45,5 +45,7 @@ jobs:
           else
             test "$?" -eq 2
           fi
-          gh release create "$tag" --target "$sha" --title "$tag" \
+          archive="$RUNNER_TEMP/seasoningway.zip"
+          git archive --format=zip --prefix=seasoningway/ --output="$archive" "$sha"
+          gh release create "$tag" "$archive" --target "$sha" --title "$tag" \
             --generate-notes
